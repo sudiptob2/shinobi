@@ -141,4 +141,9 @@ tr.click { cursor: pointer; } tr.click:hover td { background: rgba(255,255,255,.
 .pager button.on { background: var(--line); color: #fff; border-color: var(--line); }
 .pager button:disabled { opacity: .35; cursor: default; }
 .full { width: 100%; max-width: 1000px; margin: 0 auto; padding-top: 24px; }
-.page.history .main, .page.shortlist .main { max-width: 1100px; }
+.page.history .main { max-width: 1100px; }
+.pills { display: grid; gap: 6px; justify-items: end; }
+.gauge .lbl { font: 600 11px var(--mono); color: var(--faint); text-transform: uppercase; letter-spacing: .08em; }
+.expl { display: grid; gap: 6px; }
+.expl p { color: var(--text); font-size: 13.5px; line-height: 1.55; padding-left: 12px; border-left: 2px solid var(--line-2); }
+.pill.soft { background: transparent; border: 1px solid var(--line-2); }

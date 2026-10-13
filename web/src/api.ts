@@ -21,7 +21,6 @@ export const api = {
   signIn: (email: string, password: string) => json("/app/signin", { method: "POST", body: JSON.stringify({ email, password }) }),
   signUp: (email: string, password: string) => json("/app/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
   signOut: () => json("/app/signout", { method: "POST" }),
-  professors: () => json<Verdict[]>("/app/professors"),
   history: () => json<HistoryItem[]>("/app/history"),
 
   /** Run one check, calling onEvent for every step and the verdict. */

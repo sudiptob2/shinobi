@@ -21,6 +21,7 @@ export const Verdict = z.object({
       features: z.record(z.string(), z.number()),
     })
     .optional(),
+  explanation: z.array(z.string()).optional(), // why the record scored this way, one sentence per driver
   // not_scored: the reason is the output
   reason: z.string().optional(),
   openalexId: z.string().optional(),

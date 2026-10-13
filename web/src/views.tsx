@@ -4,19 +4,33 @@ import type { Verdict } from "./api";
 /* ---------- small helpers ---------- */
 
 export type Tone = "g" | "y" | "r" | "n";
-export function tone(v: Verdict): Tone {
-  if (v.tier === "stated") return v.stated!.status === "recruiting" ? "g" : "r";
-  return v.tier === "inferred" ? "y" : "n";
+const band = (p: number) => (p >= 0.6 ? "high" : p >= 0.4 ? "mid" : "low");
+
+/** One verdict from both signals: what the page says and what the publications say. */
+export function verdictOf(v: Verdict): { label: string; tone: Tone; filter: Filter } {
+  const p = v.inferred?.probability;
+  if (v.stated?.status === "not_recruiting") return { label: "Not taking", tone: "r", filter: "r" };
+  if (v.stated?.status === "recruiting") {
+    if (p == null) return { label: "Says taking, unverified", tone: "g", filter: "g" };
+    const b = band(p);
+    return b === "high" ? { label: "Taking students", tone: "g", filter: "g" } : b === "mid" ? { label: "Says taking, slower intake", tone: "y", filter: "g" } : { label: "Says taking, rarely does", tone: "y", filter: "g" };
+  }
+  if (p == null) return { label: "Not scored", tone: "n", filter: "n" };
+  const b = band(p);
+  return b === "high" ? { label: "Likely taking", tone: "g", filter: "y" } : b === "mid" ? { label: "Toss-up", tone: "y", filter: "y" } : { label: "Unlikely", tone: "r", filter: "y" };
 }
-export function label(v: Verdict): string {
-  if (v.tier === "stated") return v.stated!.status === "recruiting" ? "Taking students" : "Not taking";
-  if (v.tier === "inferred") { const p = v.inferred!.probability; return p >= 0.6 ? "Likely" : p >= 0.4 ? "Toss-up" : "Unlikely"; }
-  return "Not scored";
-}
+export const tone = (v: Verdict): Tone => verdictOf(v).tone;
+export const label = (v: Verdict): string => verdictOf(v).label;
 export function short(v: Verdict): string {
-  if (v.tier === "stated") return v.stated!.status === "recruiting" ? "yes" : "no";
-  if (v.tier === "inferred") return v.inferred!.probability.toFixed(2);
-  return "n/a";
+  if (v.stated) return v.stated.status === "recruiting" ? "yes" : "no";
+  return v.inferred ? v.inferred.probability.toFixed(2) : "n/a";
+}
+export const recordTone = (p: number): Tone => (p >= 0.6 ? "g" : p >= 0.4 ? "y" : "r");
+export function recordLine(v: Verdict): string {
+  const p = v.inferred!.probability;
+  if (!v.stated) return "of labs with this publication pattern said they were taking students";
+  if (v.stated.status === "recruiting") return p >= 0.6 ? "of labs that publish like this said yes too. The publications back the page." : p >= 0.4 ? "of labs that publish like this said yes. The page says yes, the publications are unsure." : "of labs that publish like this said yes. The page says yes, but few labs that publish like this were taking students.";
+  return p >= 0.6 ? "of labs that publish like this said yes. The page says no, so trust the page." : "of labs that publish like this said yes. The publications agree with the page.";
 }
 const host = (u?: string) => (u ? u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") : "");
 const pct = (p: number) => `${Math.round(p * 100)}%`;
@@ -95,17 +109,22 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
             <div>
               <b className="n">{verdict.name}</b>
               <small>{verdict.affiliation ?? host(verdict.pageUrl)}</small>
-              {verdict.tier === "stated" && <div className={`quote ${t}`}>"{verdict.stated!.quote}"</div>}
-              {verdict.tier === "inferred" && (
+              {verdict.stated && <div className={`quote ${t}`}>"{verdict.stated.quote}"</div>}
+              {verdict.inferred ? (
                 <div className="gauge">
-                  <span className="num">{pct(verdict.inferred!.probability)}</span>
-                  <div className="bar"><i style={{ width: pct(verdict.inferred!.probability) }} /></div>
-                  <span className="why">of labs with this publication pattern said they were taking students</span>
+                  <span className="lbl">Publication record</span>
+                  <span className="num">{pct(verdict.inferred.probability)}</span>
+                  <div className="bar"><i style={{ width: pct(verdict.inferred.probability) }} /></div>
+                  <span className="why">{recordLine(verdict)}</span>
                 </div>
+              ) : (
+                <div className="why">{verdict.stated ? "Publications not scored: " : ""}{verdict.reason}</div>
               )}
-              {verdict.tier === "not_scored" && <div className="why">{verdict.reason}</div>}
             </div>
-            <span className={`pill ${t}`}><i />{label(verdict)}{verdict.tier === "stated" && verdict.stated!.quote.match(/Fall \d{4}|\d{4}-\d{2,4}/) ? `, ${verdict.stated!.quote.match(/Fall \d{4}|\d{4}-\d{2,4}/)![0]}` : ""}</span>
+            <div className="pills">
+              <span className={`pill ${t}`}><i />{label(verdict)}</span>
+              {verdict.inferred && <span className={`pill ${recordTone(verdict.inferred.probability)} soft`}><i />Publications {pct(verdict.inferred.probability)}</span>}
+            </div>
           </div>
           <button className="more" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
             <span>{src ? <>Source: <a href={src} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{host(src)}</a></> : "No page"}{total > 0 && <> · {(total / 1000).toFixed(1)}s</>}</span>
@@ -113,15 +132,15 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
           </button>
           {open && (
             <div className="details">
-              {verdict.tier === "inferred" && (
+              {verdict.inferred && (
                 <>
-                  <div className="why">{verdict.note ? verdict.note + " " : "The page says nothing either way. "}The number means capacity, never an open slot.</div>
+                  {verdict.note && <div className="why">{verdict.note}</div>}
+                  <div className="expl">{(verdict.explanation ?? []).map((line, i) => <p key={i}>{line}</p>)}</div>
                   <div className="feat">
                     {Object.entries(verdict.inferred!.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
                   </div>
                 </>
               )}
-              {verdict.tier === "stated" && <div className="why">The professor said it. Nothing is inferred. Quoted verbatim from the page linked above.</div>}
               <div className="why mono">Checked {verdict.checkedAt.slice(0, 10)}{verdict.openalexId && <> · OpenAlex {verdict.openalexId}</>}</div>
             </div>
           )}
@@ -133,20 +152,20 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
 
 /* ---------- table ---------- */
 
-export type Filter = "all" | "g" | "y" | "r" | "n";
+export type Filter = "all" | "g" | "y" | "r" | "n"; // g: page says taking, y: inferred only, r: not taking, n: not scored
 
 const PAGE = 10;
 
 export function Table({ title, note, empty, rows, filter, onFilter, onPick, sorted, limit, onMore }: { title: string; note?: string; empty: string; rows: Verdict[]; filter: Filter; onFilter: (f: Filter) => void; onPick: (v: Verdict) => void; sorted?: boolean; limit?: number; onMore?: () => void }) {
   const [page, setPage] = useState(0);
-  const order = (v: Verdict) => (tone(v) === "g" ? 0 : tone(v) === "y" ? 1 - v.inferred!.probability : tone(v) === "r" ? 2 : 3);
-  const all = rows.filter((v) => filter === "all" || tone(v) === filter);
+  const order = (v: Verdict) => { const f = verdictOf(v).filter; const p = v.inferred?.probability ?? 0; return f === "g" ? 1 - p : f === "y" ? 2 - p : f === "r" ? 3 : 4; };
+  const all = rows.filter((v) => filter === "all" || verdictOf(v).filter === filter);
   if (sorted) all.sort((a, b) => order(a) - order(b));
   const pages = limit ? 1 : Math.max(1, Math.ceil(all.length / PAGE));
   const at = Math.min(page, pages - 1);
   const shown = limit ? all.slice(0, limit) : all.slice(at * PAGE, at * PAGE + PAGE);
-  const count = (f: Filter) => rows.filter((v) => f === "all" || tone(v) === f).length;
-  const filters: [Filter, string][] = [["all", "All"], ["g", "Taking"], ["y", "Inferred"], ["r", "Not taking"], ["n", "Not scored"]];
+  const count = (f: Filter) => rows.filter((v) => f === "all" || verdictOf(v).filter === f).length;
+  const filters: [Filter, string][] = [["all", "All"], ["g", "Says taking"], ["y", "Inferred"], ["r", "Not taking"], ["n", "Not scored"]];
   return (
     <>
       <div className="table-head">
@@ -161,11 +180,11 @@ export function Table({ title, note, empty, rows, filter, onFilter, onPick, sort
               <tr key={v.name} className="click" onClick={() => onPick(v)}>
                 <td className="n"><b>{v.name}</b><span>{v.affiliation ?? host(v.pageUrl)}</span></td>
                 <td><span className={`pill ${tone(v)}`}><i />{label(v)}</span></td>
-                <td className="p">{v.tier === "inferred" ? v.inferred!.probability.toFixed(2) : ""}</td>
+                <td className="p">{v.inferred ? v.inferred.probability.toFixed(2) : ""}</td>
                 <td className="e">
-                  {v.tier === "stated" && <>"{v.stated!.quote}"<a href={v.stated!.sourceUrl} target="_blank" rel="noreferrer">{host(v.stated!.sourceUrl)}</a></>}
-                  {v.tier === "inferred" && <>Nothing stated. {fmt("x", v.inferred!.features.new_first_authors_rate)} new first authors a year, cohort of {v.inferred!.features.junior_cohort}, {v.inferred!.features.outflow} finished recently.</>}
-                  {v.tier === "not_scored" && v.reason}
+                  {v.stated && <>"{v.stated.quote}"<a href={v.stated.sourceUrl} target="_blank" rel="noreferrer">{host(v.stated.sourceUrl)}</a></>}
+                  {!v.stated && v.inferred && <>Nothing stated. {fmt("x", v.inferred.features.new_first_authors_rate)} new first authors a year, cohort of {v.inferred.features.junior_cohort}, {v.inferred.features.outflow} finished recently.</>}
+                  {!v.stated && !v.inferred && v.reason}
                 </td>
               </tr>
             ))}

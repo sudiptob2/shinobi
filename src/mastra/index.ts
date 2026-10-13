@@ -7,7 +7,7 @@ import { Observability } from "@mastra/observability";
 import { SentryExporter } from "@mastra/sentry";
 import { check } from "./workflow.ts";
 import { reader } from "./tools/gemma.ts";
-import { checks, professors } from "./db.ts";
+import { checks } from "./db.ts";
 import { currentUser, endSession, sessionUserId, signIn, signUp, startSession } from "./auth.ts";
 
 // the server may run from its build directory, so walk up to the project root
@@ -57,9 +57,7 @@ export const mastra = new Mastra({
       registerApiRoute("/app/signout", { method: "POST", handler: async (c) => { endSession(c); return c.json({ ok: true }); } }),
       registerApiRoute("/app/me", { method: "GET", handler: async (c) => c.json(await currentUser(c)) }),
 
-      // the shortlist is public; history and checks need an account
-      registerApiRoute("/app/professors", { method: "GET", handler: async (c) =>
-        c.json(await professors.find({}, { projection: { _id: 0 } }).toArray()) }),
+      // history and checks need an account
       registerApiRoute("/app/history", { method: "GET", handler: async (c) => {
         const userId = sessionUserId(c);
         if (!userId) return c.json({ error: "Sign in to see your history" }, 401);

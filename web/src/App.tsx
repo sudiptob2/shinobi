@@ -8,10 +8,9 @@ const dedupe = (vs: Verdict[]) => vs.filter((v, i) => vs.findIndex((x) => x.name
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
-  const [professors, setProfessors] = useState<Verdict[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
-  const [view, setView] = useState<"search" | "shortlist" | "history">("search");
+  const [view, setView] = useState<"search" | "history">("search");
 
   const [query, setQuery] = useState("");
   const [running, setRunning] = useState(false);
@@ -23,7 +22,6 @@ export default function App() {
   const t0 = useRef(0), tStep = useRef(0);
 
   useEffect(() => { api.me().then(setUser).catch(() => setUser(null)); }, []);
-  useEffect(() => { if (view === "shortlist") api.professors().then(setProfessors).catch(() => {}); }, [view]);
   useEffect(() => { if (user) api.history().then(setHistory).catch(() => {}); else setHistory([]); }, [user]);
 
   const auth = async (mode: "signin" | "signup", email: string, password: string) => {
@@ -46,9 +44,8 @@ export default function App() {
       else if (e.step === "read") {
         const r = o.reading ?? {};
         patch("read", { state: "done", ms, detail: o.pageError ? o.pageError : `${(o.pages ?? []).length} pages read. ${r.status === "unstated" ? "Nothing stated" : r.status === "recruiting" ? "States they are taking students" : "States they are not taking students"}` });
-        if (r.status !== "unstated") patch("infer", { state: "skip", detail: "Skipped, the professor said it" });
       } else if (e.step === "infer") {
-        patch("infer", { state: "done", ms, detail: o.tier === "inferred" ? `OpenAlex ${o.openalexId}, TabPFN on the labeled labs: ${o.inferred.probability.toFixed(2)}` : o.reason ?? "" });
+        patch("infer", { state: "done", ms, detail: o.inferred ? `OpenAlex ${o.openalexId}, TabPFN: ${o.inferred.probability.toFixed(2)}` : o.reason ?? "" });
       } else if (e.step === "save") patch("save", { state: "done", ms, detail: "Saved to your checks" });
     } else if (e.type === "verdict") {
       setVerdict(e.verdict);
@@ -76,7 +73,7 @@ export default function App() {
     clear();
     setView("search");
     setVerdict(v);
-    setSteps(STEPS.map((id) => ({ id, state: id === "infer" && v.tier === "stated" ? "skip" : "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.tier === "inferred" ? `TabPFN: ${v.inferred!.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
+    setSteps(STEPS.map((id) => ({ id, state: "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.inferred ? `TabPFN: ${v.inferred.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -92,7 +89,6 @@ export default function App() {
         <button className="brand" onClick={() => { clear(); setView("search"); }}><b>Shinobi</b><span>Taking students?</span></button>
         <nav>
           <button className={view === "history" ? "on" : ""} onClick={() => setView("history")}>Your checks</button>
-          <button className={view === "shortlist" ? "on" : ""} onClick={() => setView("shortlist")}>Shortlist</button>
           <span className="me" title={user.email}>{user.email}</span>
           <button onClick={signOut}>Sign out</button>
         </nav>
@@ -129,11 +125,6 @@ export default function App() {
           </section>
         )}
 
-        {view === "shortlist" && (
-          <section className="full">
-            <Table title="Shortlist" note="The 59 professors Shinobi was built around. Their pages were read by hand to train the predictor." empty="Loading" rows={professors} filter={filter} onFilter={setFilter} onPick={show} sorted />
-          </section>
-        )}
 
         <footer className="foot">
           <span>A prediction means steady intake and capacity, never an open slot.</span>

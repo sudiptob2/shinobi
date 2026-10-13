@@ -8,6 +8,7 @@ import { readSite } from "./tools/page.ts";
 import { parseQuery, readPages, Reading } from "./tools/gemma.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, findAuthor, isAlphabetical } from "./tools/openalex.ts";
 import { predict } from "./tools/tabpfn.ts";
+import { explain, reference } from "./tools/explain.ts";
 
 const Input = z.object({
   query: z.string().optional(), // free text, parsed by the model
@@ -86,40 +87,40 @@ const read = createStep({
   },
 });
 
-const stated = createStep({
-  id: "stated",
-  inputSchema: Read,
-  outputSchema: Verdict,
-  execute: async ({ inputData: d }) => ({
-    name: d.name, affiliation: d.affiliation, pageUrl: d.url, tier: "stated" as const,
-    stated: { status: d.reading.status as "recruiting" | "not_recruiting", quote: d.reading.quote, sourceUrl: d.pages[d.reading.page - 1] ?? d.url },
-    checkedAt: new Date().toISOString(),
-  }),
-});
-
+// Every professor gets the publication score, stated or not. A stated "yes" with a weak record is the case a student most needs to see.
 const infer = createStep({
   id: "infer",
   inputSchema: Read,
   outputSchema: Verdict,
   execute: async ({ inputData: d }) => {
-    const base = { name: d.name, affiliation: d.affiliation, pageUrl: d.url, checkedAt: new Date().toISOString(), ...(d.pageError && { note: d.pageError }) };
-    const author = await findAuthor(d.name, d.affiliation);
-    if ("reason" in author) return { ...base, tier: "not_scored" as const, reason: author.reason };
-    const works = await fetchWorks(author.id);
-    if (works.length < 5) return { ...base, tier: "not_scored" as const, reason: `OpenAlex has only ${works.length} papers for this author since 2008, too few to score.` };
-    if (isAlphabetical(works)) return { ...base, tier: "not_scored" as const, reason: "This professor's papers list authors alphabetically, so first authorship carries no signal about students." };
-    const features = computeFeatures(works, author.id, new Date().getFullYear(), await fetchFirstYear(author.id));
-    const probability = await predict(features);
-    return { ...base, tier: "inferred" as const, inferred: { probability, features: { ...features } }, openalexId: author.id };
+    const stated = d.reading.status !== "unstated"
+      ? { status: d.reading.status as "recruiting" | "not_recruiting", quote: d.reading.quote, sourceUrl: d.pages[d.reading.page - 1] ?? d.url }
+      : undefined;
+    const base = {
+      name: d.name, affiliation: d.affiliation, pageUrl: d.url, checkedAt: new Date().toISOString(),
+      ...(stated && { stated }), ...((d.pageError || d.reading.stale) && { note: d.pageError ?? d.reading.stale }),
+    };
+    const scored = async () => {
+      const author = await findAuthor(d.name, d.affiliation);
+      if ("reason" in author) return { reason: author.reason };
+      const works = await fetchWorks(author.id);
+      if (works.length < 5) return { reason: `OpenAlex has only ${works.length} papers for this author since 2008, too few to score.`, openalexId: author.id };
+      if (isAlphabetical(works)) return { reason: "This professor's papers list authors alphabetically, so first authorship carries no signal about students.", openalexId: author.id };
+      const features = computeFeatures(works, author.id, new Date().getFullYear(), await fetchFirstYear(author.id));
+      const probability = await predict(features);
+      return { inferred: { probability, features: { ...features } }, openalexId: author.id, explanation: explain(features, probability, await reference(), stated?.status) };
+    };
+    const r = await scored();
+    const tier = stated ? ("stated" as const) : "inferred" in r ? ("inferred" as const) : ("not_scored" as const);
+    return { ...base, ...r, tier };
   },
 });
 
 const save = createStep({
   id: "save",
-  inputSchema: z.object({ stated: Verdict.optional(), infer: Verdict.optional() }),
+  inputSchema: Verdict,
   outputSchema: Verdict,
-  execute: async ({ inputData }) => {
-    const verdict = (inputData.stated ?? inputData.infer)!;
+  execute: async ({ inputData: verdict }) => {
     await professors.replaceOne({ name: verdict.name }, verdict, { upsert: true });
     return verdict;
   },
@@ -129,9 +130,6 @@ export const check = createWorkflow({ id: "check", inputSchema: Input, outputSch
   .then(parse)
   .then(locate)
   .then(read)
-  .branch([
-    [async ({ inputData }) => inputData.reading.status !== "unstated", stated],
-    [async ({ inputData }) => inputData.reading.status === "unstated", infer],
-  ])
+  .then(infer)
   .then(save)
   .commit();

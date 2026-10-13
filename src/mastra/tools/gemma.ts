@@ -14,6 +14,8 @@ export const Reading = z.object({
   quote: z.string(),
   page: z.number().int(),
   confidence: z.number().min(0).max(1),
+  date: z.string().optional(), // a date printed next to the statement, as written on the page
+  stale: z.string().optional(), // set by code when the statement is for a past cycle
 });
 export type Reading = z.infer<typeof Reading>;
 
@@ -37,14 +39,28 @@ These are NOT statements and must be "unstated":
 - headings, menu items, section titles or lists of duties ("PhD Supervision", "Graduate students", "Current students")
 - invitations to apply, email, send a CV, or read another page ("prospective students, please apply to the department and mention my name")
 - conditionals ("I may recruit", "subject to funding")
-- statements for a past cycle: anything naming Fall ${year} or earlier as the start, or carrying a date before ${year - 1}, including a date tag like "[January ${year - 2}]" in front of the sentence. A past-cycle statement is "unstated", never "not_recruiting"
+- statements for a past cycle: anything naming Fall ${year} or earlier as the start. Report any date printed next to the statement in "date" exactly as written (a news-item date, a year in the sentence, a "last updated" line); leave it empty if none
 - text about postdocs, interns, undergraduates or master's students only
 
 Copy the decisive sentence VERBATIM into "quote" (empty string if unstated). "page" is the 1-based index of the page the quote came from (0 if none). "confidence" is 0 to 1.
 
-Reply with exactly: {"status": "...", "quote": "...", "page": N, "confidence": X}
+Reply with exactly: {"status": "...", "quote": "...", "page": N, "confidence": X, "date": "..."}
 
 ${pages.map((p, i) => `=== PAGE ${i + 1}: ${p.url}\n${p.text}`).join("\n\n")}`;
+
+/** A statement dated before last year, or naming this fall or earlier as the start, is history, not a status. */
+export function applyStaleness(r: Reading, year: number): Reading {
+  if (r.status === "unstated") return r;
+  const text = `${r.date ?? ""} ${r.quote}`;
+  const years = [...text.matchAll(/\b(20\d{2})\b/g)].map((m) => Number(m[1]));
+  // the start cycle is the latest "Fall YYYY" mentioned; "(Fall 2026) ... start in Fall 2027" is current
+  const falls = [...r.quote.matchAll(/\b(?:fall|autumn|september)\s+(20\d{2})/gi)].map((m) => Number(m[1]));
+  const dated = r.date ? Math.max(...[...(r.date.matchAll(/\b(20\d{2})\b/g))].map((m) => Number(m[1])), 0) : 0;
+  const tooOld = falls.length ? Math.max(...falls) <= year : (dated > 0 && dated < year - 1) || (!dated && years.length > 0 && Math.max(...years) < year - 1);
+  if (!tooOld) return r;
+  const when = r.date || String(Math.max(...years));
+  return { ...r, status: "unstated", stale: `${r.status === "recruiting" ? "A recruiting" : "A not-recruiting"} note dated ${when} was found and ignored as out of date: "${r.quote}"` };
+}
 
 export async function readPages(name: string, pages: { url: string; text: string }[]): Promise<Reading> {
   const prompt = PROMPT(name, new Date().getFullYear(), pages);
@@ -54,7 +70,7 @@ export async function readPages(name: string, pages: { url: string; text: string
       const res = await reader.generate(prompt);
       const json = res.text.match(/\{[\s\S]*\}/)?.[0];
       if (!json) throw new Error(`Gemma returned no JSON: ${res.text.slice(0, 200)}`);
-      return Reading.parse(JSON.parse(json));
+      return applyStaleness(Reading.parse(JSON.parse(json)), new Date().getFullYear());
     } catch (e) {
       if (attempt >= 4) throw e;
       // quota errors say how long to wait; everything else gets a short backoff
