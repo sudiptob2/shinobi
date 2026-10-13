@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import type { Verdict } from "./verdict.js";
+import type { Verdict } from "./verdict.ts";
 
 export type FeatureRow = {
   openalexId: string;
