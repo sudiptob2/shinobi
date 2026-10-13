@@ -23,6 +23,8 @@ export const Verdict = z.object({
     .optional(),
   // not_scored: the reason is the output
   reason: z.string().optional(),
+  openalexId: z.string().optional(),
+  note: z.string().optional(),
   checkedAt: z.string().datetime(),
 });
 export type Verdict = z.infer<typeof Verdict>;

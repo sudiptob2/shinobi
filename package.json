@@ -4,7 +4,9 @@
   "private": true,
   "description": "Taking students? Ranks a shortlist of professors by likelihood of accepting new PhD students.",
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "mastra dev",
     "build": "mastra build",
@@ -18,7 +20,8 @@
     "@ai-sdk/google": "4.0.95",
     "@mastra/core": "1.76.0",
     "@mastra/mongodb": "1.23.0",
-    "@sentry/node": "11.7.0",
+    "@mastra/observability": "^1.19.0",
+    "@mastra/sentry": "^1.2.25",
     "mongodb": "^7.5.0",
     "zod": "^4.0.0"
   },

@@ -14,3 +14,4 @@ const db = client.db(process.env.MONGODB_DB ?? "shinobi");
 
 export const professors = db.collection<Verdict>("professors");
 export const features = db.collection<FeatureRow>("features");
+export const models = db.collection<{ hash: string; fittedTrainSetId: string; rows: number; fittedAt: string }>("models");
