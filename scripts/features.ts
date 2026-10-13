@@ -21,6 +21,7 @@ for (const r of rows) {
     name: r.name,
     features: computeFeatures(works, r.openalex_id, YEAR, firstYear),
     alphabetical: isAlphabetical(works),
+    status: r.status || null,
     works: works.length,
     pulledAt: new Date().toISOString(),
   };

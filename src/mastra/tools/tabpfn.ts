@@ -2,7 +2,6 @@
 import { createHash } from "node:crypto";
 import { features, models, professors } from "../db.ts";
 import type { Features } from "./openalex.ts";
-import { readCsv } from "../csv.ts";
 
 const API = "https://api.priorlabs.ai/tabpfn";
 export const COLUMNS: (keyof Features)[] = ["new_first_authors_rate", "new_first_authors_trend", "junior_cohort", "outflow", "pub_rate", "pub_rate_trend", "career_years", "years_since_last"];
@@ -28,17 +27,10 @@ const csvOf = (rows: number[][], header: string[]) => [header.join(","), ...rows
 
 /** The training table: every professor with a stated status, features, and non-alphabetical authorship. */
 export async function trainingTable() {
-  const labels = new Map<string, number>();
-  for (const file of ["data/shortlist.csv", "data/negatives.csv"]) {
-    for (const r of readCsv(file)) {
-      if (r.status === "recruiting") labels.set(r.openalex_id, 1);
-      else if (r.status === "not_recruiting") labels.set(r.openalex_id, 0);
-    }
-  }
-  const docs = await features.find({ openalexId: { $in: [...labels.keys()] }, alphabetical: false }).toArray();
+  const docs = await features.find({ status: { $in: ["recruiting", "not_recruiting"] }, alphabetical: false }).toArray();
   return {
     x: docs.map((d) => COLUMNS.map((c) => d.features[c])),
-    y: docs.map((d) => labels.get(d.openalexId)!),
+    y: docs.map((d) => (d.status === "recruiting" ? 1 : 0)),
     names: docs.map((d) => d.name),
   };
 }

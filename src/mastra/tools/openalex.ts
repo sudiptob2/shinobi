@@ -30,19 +30,29 @@ async function get<T>(u: URL): Promise<T> {
   }
 }
 
-export async function findAuthor(name: string, affiliation?: string) {
+export type AuthorMatch = { id: string; name: string } | { reason: string };
+
+/** The OpenAlex author for a name, or a reason not to guess. */
+export async function findAuthor(name: string, affiliation?: string): Promise<AuthorMatch> {
   const u = new URL(`${API}/authors`);
   u.searchParams.set("search", name);
-  u.searchParams.set("per_page", "5");
-  u.searchParams.set("select", "id,display_name,last_known_institutions,works_count");
+  u.searchParams.set("per_page", "10");
+  u.searchParams.set("select", "id,display_name,affiliations,works_count");
   const { results } = await get<{ results: any[] }>(u);
-  const hint = affiliation?.toLowerCase().split(/[, ]+/).filter((w) => w.length > 3) ?? [];
-  const score = (a: any) => {
-    const inst = (a.last_known_institutions ?? []).map((i: any) => i.display_name.toLowerCase()).join(" ");
-    return hint.filter((w) => inst.includes(w)).length * 1000 + a.works_count;
-  };
-  results.sort((a, b) => score(b) - score(a));
-  return results[0] ? { id: results[0].id.split("/").pop() as string, name: results[0].display_name as string } : null;
+  const norm = (n: string) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w.length > 1);
+  const want = norm(name);
+  const named = results.filter((a) => { const have = norm(a.display_name); return want.every((w) => have.includes(w)); }).filter((a) => a.works_count >= 5);
+  if (!named.length) return { reason: `OpenAlex has no author named ${name} with at least five papers, so there is no publication history to score.` };
+
+  const hint = (affiliation ?? "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3 && !["university", "department", "school", "college", "institute", "professor"].includes(w));
+  if (hint.length) {
+    const at = named.filter((a) => (a.affiliations ?? []).some((x: any) => hint.some((w) => x.institution.display_name.toLowerCase().includes(w))));
+    if (!at.length) return { reason: `OpenAlex has ${named.length === 1 ? "an author" : "authors"} named ${name}, but none at ${affiliation}. The name may be spelled differently there, so this was not scored.` };
+    at.sort((a, b) => b.works_count - a.works_count);
+    return { id: at[0].id.split("/").pop(), name: at[0].display_name };
+  }
+  if (named.length > 1) return { reason: `${named.length} researchers on OpenAlex share the name ${name}. Add the university to the check so the right one is scored.` };
+  return { id: named[0].id.split("/").pop(), name: named[0].display_name };
 }
 
 export async function fetchWorks(authorId: string, since = 2008): Promise<Work[]> {

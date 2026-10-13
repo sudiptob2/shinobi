@@ -4,7 +4,7 @@ export type Page = { url: string; text: string };
 const UA = "Mozilla/5.0 (compatible; Shinobi/0.1; +https://askshinobi.tech)";
 const STRONG = /\b(prospective|join(ing)?( us| the lab)?|openings?|recruit(ing|ment)?|hiring|positions?)\b/i;
 const FOLLOW = /\b(prospective|join(ing)?|students?|openings?|recruit(ing|ment)?|positions?|hiring|faq|apply|contact)\b/i;
-const LAB = /\b(lab|laboratory|group)\b/i;
+const LAB = /\b(lab|laboratory|group|homepage|personal (web)?site|website)\b/i;
 const MAX_CHARS = 6000;
 const KEYWORDS = /ph\.?d|doctoral|graduate student|prospective|recruit|opening|position|hiring|join|advis|supervis|on leave|sabbatical|lab is full|not (taking|accepting|hiring|recruiting)/i;
 
@@ -30,6 +30,12 @@ export function focus(text: string, max = MAX_CHARS): string {
     out += paras[i] + "\n";
   }
   return out;
+}
+
+/** The university named in a page title, if any ("Anwar Haque | Western University" -> "Western University"). */
+export function schoolFromTitle(html: string): string | undefined {
+  const t = htmlToText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+  return t.split(/[|–\-:]/).map((x) => x.trim()).find((x) => /universit|college|institute|school/i.test(x));
 }
 
 export function title(html: string): string {
@@ -61,9 +67,10 @@ export function candidateLinks(html: string, base: string): string[] {
 }
 
 // ponytail: no Wayback fallback for dead pages; add if live checks hit many 404s.
-export async function readSite(url: string, surname?: string, maxPages = 6): Promise<{ name: string; pages: Page[] }> {
+export async function readSite(url: string, surname?: string, maxPages = 6): Promise<{ name: string; school?: string; pages: Page[] }> {
   const html = await fetchHtml(url);
   const name = title(html);
+  const school = schoolFromTitle(html);
   const who = (surname ?? name.split(/\s+/).pop() ?? "").toLowerCase();
   const pages: Page[] = [{ url, text: focus(htmlToText(html)) }];
   const queue = candidateLinks(html, url).map((l) => ({ link: l, depth: 1 }));
@@ -82,5 +89,5 @@ export async function readSite(url: string, surname?: string, maxPages = 6): Pro
         queue.unshift(...candidateLinks(h, link).filter((l) => /prospective|join|opening|recruit|hiring|contact|apply/i.test(l)).slice(0, 2).map((l) => ({ link: l, depth: 2 })));
     } catch { /* skip dead links */ }
   }
-  return { name, pages };
+  return { name, school, pages };
 }

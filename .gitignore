@@ -9,3 +9,4 @@ dist
 *.duckdb
 *.duckdb.wal
 BRIEF.md
+.superpowers/

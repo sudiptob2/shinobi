@@ -34,6 +34,7 @@ Decide from the pages below whether the professor EXPLICITLY states a recruiting
 - "unstated": anything else.
 
 These are NOT statements and must be "unstated":
+- headings, menu items, section titles or lists of duties ("PhD Supervision", "Graduate students", "Current students")
 - invitations to apply, email, send a CV, or read another page ("prospective students, please apply to the department and mention my name")
 - conditionals ("I may recruit", "subject to funding")
 - statements for a past cycle: anything naming Fall ${year} or earlier as the start, or carrying a date before ${year - 1}, including a date tag like "[January ${year - 2}]" in front of the sentence. A past-cycle statement is "unstated", never "not_recruiting"
@@ -61,4 +62,24 @@ export async function readPages(name: string, pages: { url: string; text: string
       await new Promise((r) => setTimeout(r, Math.min(wait + 500, 60000)));
     }
   }
+}
+
+/** Split free text like "Pam Bishop Western" into the person and the institution. */
+export async function parseQuery(query: string): Promise<{ name: string; affiliation?: string }> {
+  const res = await reader.generate(`A student typed this into a box that asks for a professor's name and university:
+"${query}"
+Split it into the person and the institution. A person's name is two or three words; anything else is the institution, including short forms and nicknames of universities (Western, Brock, Penn, MIT, CMU, UWO, UofT, Mila). Keep the student's spelling. Do not add a university that was not typed. Titles and degrees (Dr., Prof., PhD, MD, Professor) are not an institution and not part of the name.
+Examples:
+"Pam Bishop Western" -> {"name": "Pam Bishop", "affiliation": "Western"}
+"prof. anwar haque uwo" -> {"name": "anwar haque", "affiliation": "uwo"}
+"Hamed Hassani" -> {"name": "Hamed Hassani", "affiliation": ""}
+"Isha DeCoito, PhD" -> {"name": "Isha DeCoito", "affiliation": ""}
+"Daniel Ansari at Western University psychology" -> {"name": "Daniel Ansari", "affiliation": "Western University"}
+Reply with exactly one JSON object: {"name": "...", "affiliation": "..."}`);
+  const json = res.text.match(/\{[\s\S]*\}/)?.[0];
+  const p = json ? (JSON.parse(json) as { name?: string; affiliation?: string }) : {};
+  const strip = (x?: string) => (x ?? "").replace(/\b(dr|prof|professor|phd|ph\.d|md|mr|ms|mrs)\b\.?,?/gi, "").replace(/\s+/g, " ").trim();
+  const name = strip(p.name) || strip(query) || query.trim();
+  const affiliation = strip(p.affiliation);
+  return { name, affiliation: affiliation || undefined };
 }

@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { extname, join, normalize } from "node:path";
 import { Mastra } from "@mastra/core/mastra";
 import { registerApiRoute } from "@mastra/core/server";
 import { MongoDBStore } from "@mastra/mongodb";
@@ -6,7 +7,30 @@ import { Observability } from "@mastra/observability";
 import { SentryExporter } from "@mastra/sentry";
 import { check } from "./workflow.ts";
 import { reader } from "./tools/gemma.ts";
-import { professors } from "./db.ts";
+import { checks, professors } from "./db.ts";
+import { currentUser, endSession, sessionUserId, signIn, signUp, startSession } from "./auth.ts";
+
+// the server may run from its build directory, so walk up to the project root
+function findRoot(dir = process.cwd()): string {
+  for (let d = dir; ; d = join(d, "..")) {
+    if (existsSync(join(d, "web/dist/index.html")) || existsSync(join(d, "web/package.json"))) return d;
+    if (join(d, "..") === d) return dir;
+  }
+}
+const WEB = join(findRoot(), "web/dist");
+const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
+
+// ponytail: in-memory per-user limit, resets on restart; move to Atlas if abuse shows up.
+const CHECKS_PER_HOUR = 20;
+const usage = new Map<string, number[]>();
+function allow(userId: string) {
+  const now = Date.now(), recent = (usage.get(userId) ?? []).filter((t) => now - t < 36e5);
+  if (recent.length >= CHECKS_PER_HOUR) return false;
+  usage.set(userId, [...recent, now]);
+  return true;
+}
+
+const fail = (e: unknown) => ({ error: (e as Error).message });
 
 export const mastra = new Mastra({
   workflows: { check },
@@ -21,23 +45,74 @@ export const mastra = new Mastra({
   }),
   server: {
     apiRoutes: [
-      registerApiRoute("/", { method: "GET", handler: async (c) => c.html(readFileSync("public/index.html", "utf8")) }),
-      registerApiRoute("/api/professors", {
-        method: "GET",
-        handler: async (c) => c.json(await professors.find({}, { projection: { _id: 0 } }).sort({ "inferred.probability": -1 }).toArray()),
-      }),
-      registerApiRoute("/api/check", {
-        method: "POST",
-        handler: async (c) => {
-          const { query } = (await c.req.json()) as { query?: string };
-          if (!query?.trim()) return c.json({ error: "Give a professor's name or page URL" }, 400);
-          const input = /^https?:\/\//i.test(query.trim()) ? { url: query.trim() } : { name: query.trim() };
-          const run = await check.createRun();
-          const result = await run.start({ inputData: input });
-          if (result.status !== "success") return c.json({ error: (result as any).error?.message ?? result.status }, 500);
-          return c.json(result.result);
-        },
-      }),
+      // accounts
+      registerApiRoute("/app/signup", { method: "POST", handler: async (c) => {
+        try { const { email, password } = await c.req.json(); startSession(c, await signUp(email, password)); return c.json({ ok: true }); }
+        catch (e) { return c.json(fail(e), 400); }
+      } }),
+      registerApiRoute("/app/signin", { method: "POST", handler: async (c) => {
+        try { const { email, password } = await c.req.json(); startSession(c, await signIn(email, password)); return c.json({ ok: true }); }
+        catch (e) { return c.json(fail(e), 401); }
+      } }),
+      registerApiRoute("/app/signout", { method: "POST", handler: async (c) => { endSession(c); return c.json({ ok: true }); } }),
+      registerApiRoute("/app/me", { method: "GET", handler: async (c) => c.json(await currentUser(c)) }),
+
+      // the shortlist is public; history and checks need an account
+      registerApiRoute("/app/professors", { method: "GET", handler: async (c) =>
+        c.json(await professors.find({}, { projection: { _id: 0 } }).toArray()) }),
+      registerApiRoute("/app/history", { method: "GET", handler: async (c) => {
+        const userId = sessionUserId(c);
+        if (!userId) return c.json({ error: "Sign in to see your history" }, 401);
+        return c.json(await checks.find({ userId }, { projection: { _id: 0, userId: 0 } }).sort({ createdAt: -1 }).limit(100).toArray());
+      } }),
+
+      // one check, streamed as server-sent events: step events, then the verdict
+      registerApiRoute("/app/check", { method: "POST", handler: async (c) => {
+        const userId = sessionUserId(c);
+        if (!userId) return c.json({ error: "Sign in to check a professor" }, 401);
+        if (!allow(userId)) return c.json({ error: `You have used ${CHECKS_PER_HOUR} checks this hour. Try again later` }, 429);
+        const { query } = (await c.req.json()) as { query?: string };
+        const q = query?.trim() ?? "";
+        if (!q) return c.json({ error: "Type a professor's name or paste a faculty page URL" }, 400);
+        const input = /^https?:\/\//i.test(q) ? { url: q } : { query: q };
+
+        const run = await check.createRun();
+        const stream = await run.stream({ inputData: input });
+        const enc = new TextEncoder();
+        const body = new ReadableStream({
+          async start(ctrl) {
+            const send = (ev: unknown) => ctrl.enqueue(enc.encode(`data: ${JSON.stringify(ev)}\n\n`));
+            let stepError = "";
+            try {
+              for await (const chunk of stream.fullStream as AsyncIterable<any>) {
+                if (chunk.type === "workflow-step-start") send({ type: "start", step: chunk.payload.id });
+                else if (chunk.type === "workflow-step-result") {
+                  if (chunk.payload.status === "failed") stepError = chunk.payload.error?.message ?? String(chunk.payload.error ?? "");
+                  send({ type: "result", step: chunk.payload.id, output: chunk.payload.output });
+                }
+                else if (chunk.type === "workflow-finish") {
+                  const verdict = chunk.payload.finalWorkflowResult;
+                  if (chunk.payload.workflowStatus === "success" && verdict) {
+                    await checks.insertOne({ userId, query: q, name: verdict.name, verdict, createdAt: new Date().toISOString() });
+                    send({ type: "verdict", verdict });
+                  } else send({ type: "error", message: stepError || chunk.payload.error?.message || "The check did not finish" });
+                }
+              }
+            } catch (e) { send({ type: "error", message: (e as Error).message }); }
+            ctrl.close();
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+      } }),
+
+      // the built web app, with the SPA fallback
+      registerApiRoute("/*", { method: "GET", handler: async (c) => {
+        const path = normalize(new URL(c.req.url).pathname).replace(/^(\.\.[/\\])+/, "");
+        const file = join(WEB, path);
+        const target = existsSync(file) && extname(file) ? file : join(WEB, "index.html");
+        if (!existsSync(target)) return c.text("Web app not built. Run: npm run build", 404);
+        return c.body(readFileSync(target), 200, { "content-type": MIME[extname(target)] ?? "application/octet-stream" });
+      } }),
     ],
   },
 });
