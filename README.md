@@ -48,7 +48,6 @@ The other three are ordinary code.
   A statement about a past admissions cycle is marked as *stale* and ignored.
 4. **grants**: counts the professor's active NSF awards and checks how recent the latest one is.
 5. **infer** (agent): turns the publication record from OpenAlex into ten numbers, such as how often the professor is last author and how many students at their own institution are publishing with them, asks Gemma for a probability from those numbers alone, and writes the explanation from the same numbers in code, so *the words can never disagree with the score*.
-  It **refuses to guess** when the field lists authors alphabetically, when the record is too thin, or when the name is ambiguous.
 6. **save**: stores the verdict in your history.
 
 The two signals, **what the page says** and **what the record says**, are combined into one label: *Taking students*, *Says taking but slower intake*, *Says taking but rarely does*, *Not taking*, *Likely*, *Toss-up*, *Unlikely*, or *Not scored* with the reason.
