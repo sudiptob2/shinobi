@@ -13,10 +13,12 @@ Live at [https://askshinobi.tech](https://askshinobi.tech)
 
 ## Why
 
-When I was applying for a Master's, I made a list of professors whose work I liked and emailed them one by one.
+A friend of mine is applying for a PhD.
+She made a list of professors whose work she liked and emailed them one by one.
 **Most of them never replied.**
-At first I thought my emails were the problem.
-Then I looked closer at the list and saw that many of those professors were simply **not taking new students that year**.
+She asked me for help, because I had been through the same thing for my Master's and had come out of it with scholarships.
+So we sat down with her list.
+Many of those professors were simply **not taking new students that year**.
 Some of their pages said nothing about it.
 Some said "I am always looking for students", but the note was *three or four years old*.
 There was *no way to know* before sending the email.
@@ -37,15 +39,15 @@ It puts all of that together into **one verdict**, with the professor's own word
 ![Architecture](docs/architecture.png)
 
 A check is a [Mastra](https://mastra.ai) workflow with six steps.
-Two of the steps are run by an **agent**: a reader built on Gemma, served from any OpenAI-compatible endpoint.
-The other four are ordinary code.
+Three of the steps are run by an **agent** built on Gemma, served from any OpenAI-compatible endpoint; in production it is Gemma 4 26B on my own GPU through vLLM.
+The other three are ordinary code.
 
 1. **parse** (agent): turns what you typed into a person and a university.
 2. **locate**: searches with SerpApi for the faculty or lab page, preferring university sites and skipping aggregator sites.
 3. **read** (agent): fetches the page and its lab pages, then the reader answers four questions: is there a recruiting statement, *what exactly does it say*, which page is it on, and when was it written.
   A statement about a past admissions cycle is marked as *stale* and ignored.
 4. **grants**: counts the professor's active NSF awards and checks how recent the latest one is.
-5. **infer**: turns the publication record from OpenAlex into ten numbers, asks TabPFN for a probability, and writes an explanation from those same numbers, so *the words can never disagree with the score*.
+5. **infer** (agent): turns the publication record from OpenAlex into ten numbers, such as how often the professor is last author and how many students at their own institution are publishing with them, asks Gemma for a probability from those numbers alone, and writes the explanation from the same numbers in code, so *the words can never disagree with the score*.
   It **refuses to guess** when the field lists authors alphabetically, when the record is too thin, or when the name is ambiguous.
 6. **save**: stores the verdict in your history.
 
@@ -59,13 +61,12 @@ In the last batch run, the reader agreed with my hand labels for **50 of 59** pr
 ## Run it
 
 ```
-cp .env.example .env            # SerpApi, Prior Labs and Gemma keys
+cp .env.example .env            # SerpApi and Gemma keys
 docker compose up --build       # http://localhost:4111
 ```
 
-The first start fills the labeled table that TabPFN learns from, which takes a couple of minutes.
-For development, run `docker compose up mongo seed` and then `npm run dev`.
-To check your changes: `npm test`, `npm run typecheck`, `npm run lint --prefix web`, and `npm run batch` to score the reader against the hand labels.
+For development, run `docker compose up mongo` and then `npm run dev`.
+To check your changes: `npm test`, `npm run typecheck`, `npm run lint --prefix web`, then `npm run batch` to score the reader and `npm run judge` to score the record judge, both against the hand labels.
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 

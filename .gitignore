@@ -10,3 +10,4 @@ dist
 *.duckdb.wal
 BRIEF.md
 .superpowers/
+plans/
