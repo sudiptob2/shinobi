@@ -59,7 +59,8 @@ export function candidateLinks(html: string, base: string): string[] {
     const offsite = new URL(href).host !== host;
     // off-site links are followed only when they look like the professor's own lab or a recruiting page
     if (offsite && !LAB.test(text) && !STRONG.test(text)) continue;
-    const score = (STRONG.test(text + " " + href) ? 3 : 0) + (FOLLOW.test(text) ? 2 : 0) + (FOLLOW.test(href) ? 1 : 0) + (offsite && LAB.test(text) ? 2 : 0);
+    // a "Homepage" or "Lab" link counts on any host: department profiles often point at the professor's own site under a path like /~name
+    const score = (STRONG.test(text + " " + href) ? 3 : 0) + (FOLLOW.test(text) ? 2 : 0) + (FOLLOW.test(href) ? 1 : 0) + (LAB.test(text) ? 3 : 0) + (/\/~\w+/.test(href) ? 1 : 0);
     if (score) out.set(href, Math.max(out.get(href) ?? 0, score));
   }
   return [...out].sort((a, b) => b[1] - a[1]).map(([h]) => h);
