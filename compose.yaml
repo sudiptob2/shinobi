@@ -1,6 +1,14 @@
-# Local stack: Mongo plus the app. Add `--profile gemma` to run the page reader on a local Gemma through Ollama.
-#   docker compose up --build            app on http://localhost:4111
-#   docker compose run --rm app npm run features    fill the labeled table once, so scoring works
+# Local stack: Mongo, a one-off seed of the labeled table, then the app on http://localhost:4111.
+#   docker compose up --build
+x-app: &app
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    MONGODB_URI: mongodb://mongo:27017
+    MONGODB_DB: shinobi
+
 services:
   mongo:
     image: mongo:8
@@ -12,28 +20,21 @@ services:
       timeout: 5s
       retries: 12
 
-  app:
-    build: .
-    ports: ["4111:4111"]
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      MONGODB_URI: mongodb://mongo:27017
-      MONGODB_DB: shinobi
+  # Pulls OpenAlex and NSF data for the 76 labeled professors, which TabPFN learns from.
+  # Takes a couple of minutes the first time and is skipped once the table is full.
+  seed:
+    <<: *app
+    command: ["npm", "run", "features"]
     depends_on:
       mongo:
         condition: service_healthy
 
-  # Optional: a local Gemma for the page reader. Point the app at it with
-  # GEMMA_BASE_URL=http://ollama:11434/v1  GEMMA_MODEL=gemma3:4b  GEMMA_API_KEY=ollama
-  ollama:
-    image: ollama/ollama
-    profiles: [gemma]
-    ports: ["11434:11434"]
-    volumes: [ollama:/root/.ollama]
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull ${OLLAMA_MODEL:-gemma3:4b} && wait"]
+  app:
+    <<: *app
+    ports: ["4111:4111"]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
 
 volumes:
   mongo:
-  ollama:

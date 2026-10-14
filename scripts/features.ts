@@ -1,4 +1,5 @@
-// Pull OpenAlex features for every labeled professor into the Atlas features collection.
+// Pull OpenAlex features for every labeled professor into the features collection.
+// Skips when the table is already complete, so it can run on every start; pass --refresh to pull again.
 import { readdirSync } from "node:fs";
 import { readCsv } from "../src/mastra/csv.ts";
 import { features, type FeatureRow } from "../src/mastra/db.ts";
@@ -11,6 +12,12 @@ const rows = readdirSync("data")
   .filter((f) => f.endsWith(".csv"))
   .flatMap((f) => readCsv(`data/${f}`))
   .filter((r) => r.openalex_id);
+
+const have = await features.countDocuments({ openalexId: { $in: rows.map((r) => r.openalex_id) } });
+if (have === rows.length && !process.argv.includes("--refresh")) {
+  console.log(`features table already has all ${have} labeled professors. Run with --refresh to pull again.`);
+  process.exit(0);
+}
 
 let n = 0;
 for (const r of rows) {

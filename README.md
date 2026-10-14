@@ -35,15 +35,12 @@ You need Docker and the keys below.
 ```
 git clone https://github.com/sudiptob2/shinobi && cd shinobi
 cp .env.example .env            # fill in the keys
-docker compose up --build       # Mongo plus the app on http://localhost:4111
+docker compose up --build       # Mongo, then the app on http://localhost:4111
 ```
 
-Then, once, fill the labeled table that TabPFN learns from.
-It pulls OpenAlex and NSF data for the 76 labeled professors and takes a couple of minutes.
-
-```
-docker compose run --rm app npm run features
-```
+The first start also fills the labeled table that TabPFN learns from, by pulling OpenAlex and NSF data for the 76 labeled professors.
+That takes a couple of minutes and shows in the `seed` service's log; later starts skip it.
+To pull the table again, for example after editing the CSVs, run `docker compose run --rm seed npm run features -- --refresh`.
 
 Create an account in the app and check a professor.
 
@@ -53,36 +50,17 @@ Create an account in the app and check a professor.
 |---|---|---|
 | `SERPAPI_API_KEY` | finding the page | https://serpapi.com, free tier is enough |
 | `PRIORLABS_API_KEY` | TabPFN scoring | https://priorlabs.ai |
-| `GEMMA_BASE_URL`, `GEMMA_API_KEY`, `GEMMA_MODEL` | reading the page | any OpenAI-compatible server, see below |
+| `GEMMA_BASE_URL`, `GEMMA_API_KEY`, `GEMMA_MODEL` | reading the page | any OpenAI-compatible server hosting Gemma, or Google AI Studio when the base URL is empty |
 | `SESSION_SECRET` | signing the login cookie | `openssl rand -hex 32` |
 | `OPENALEX_API_KEY` | optional, lifts the unkeyed OpenAlex rate limit | https://openalex.org |
 | `SENTRY_DSN` | optional, traces every run | https://sentry.io |
-
-### Running the reader on a local Gemma
-
-The reader only needs an OpenAI-compatible endpoint, so a local Gemma through Ollama works with no key.
-
-```
-docker compose --profile gemma up --build
-```
-
-Set these in `.env` first.
-
-```
-GEMMA_BASE_URL=http://ollama:11434/v1
-GEMMA_MODEL=gemma3:4b
-GEMMA_API_KEY=ollama
-```
-
-The first start downloads the model, about 3 GB.
-Pick a larger model with `OLLAMA_MODEL=gemma3:12b` if your machine can run it; the 4B model is fine for development and weaker on long pages.
 
 ### Hot reload
 
 For day-to-day work, run Mongo in Docker and the app on your machine.
 
 ```
-docker compose up mongo
+docker compose up mongo seed    # Mongo, with the labeled table filled
 npm install && npm install --prefix web
 npm run dev                     # the Mastra server on http://localhost:4111
 npm run build --prefix web      # rebuild the web app after changing it; the server serves web/dist
