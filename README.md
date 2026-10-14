@@ -80,13 +80,14 @@ npm run batch                   # runs the workflow over the labeled shortlist a
 ## Deploying
 
 CI runs on every push and pull request: typecheck, tests, lint, the web build and a Docker build.
-On `main`, after those pass, the workflow calls Render's deploy hook, and Render builds the same Dockerfile.
+On `main`, after those pass, the workflow asks Render to deploy that commit through its API, and Render builds the same Dockerfile.
+Render does not watch the branch itself, so nothing ships that failed the checks.
 
 To set it up once:
 
-1. In Render, create a Blueprint from this repo. `render.yaml` declares the service and the secrets to enter.
+1. In Render, connect your GitHub account, then create the web service from this repo with the Docker runtime and the variables in `.env.example`. `render.yaml` is a Blueprint that declares the same service.
 2. Allow Render's outbound IPs in the MongoDB Atlas network access list.
-3. Copy the service's deploy hook URL into the repository secret `RENDER_DEPLOY_HOOK`.
+3. Add the repository secrets `RENDER_API_KEY` and `RENDER_SERVICE_ID`.
 
 The image also runs anywhere else that takes a Dockerfile.
 It listens on `PORT`, default 4111, and needs the same variables as `.env.example`.
