@@ -72,6 +72,21 @@ The check is a [Mastra](https://mastra.ai) workflow with six steps.
 The plan is fixed, which is deliberate: a student should get the same kind of answer every time, and a fixed plan is what makes the trace in the interface meaningful.
 The judgment lives inside the steps, in the model that reads the pages, in the rules about which links to follow, and in the refusals.
 
+### Where the agent is
+
+There is one agent, the **reader**, a Mastra `Agent` running Gemma through any OpenAI-compatible host.
+Two of the six steps hand it a task and act on what it returns:
+
+- In **parse** it reads whatever the student typed and decides which words are the person and which are the institution, including nicknames and short forms, and ignores titles and degrees.
+- In **read** it is given up to six pages of text and has to decide whether the professor states a recruiting status at all, which single sentence is the decisive one, which page it is on, and what date, if any, is printed next to it.
+  It must tell a real statement apart from headings, invitations to apply, conditionals, notes about postdocs, and notes about past cycles.
+  It answers in a fixed JSON shape, is retried on provider errors, and its answer is checked by code before it is trusted: a statement for a past cycle is overruled and reported as stale.
+
+The other four steps are tools, deterministic code with no model in the loop: search and page fetching with their scoring rules, the NSF lookup, the feature computation, the TabPFN call, and the sentence-by-sentence explanation.
+That split is on purpose.
+The model does the two things that need reading comprehension, and everything that can be checked, tested or reproduced is done without it.
+The workflow is the agent's plan: the same six steps every time, each one visible in the interface as it runs, each one able to refuse with a reason instead of guessing.
+
 ### The components
 
 **Query parser** (`tools/gemma.ts`, step 1).
