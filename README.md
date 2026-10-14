@@ -54,12 +54,6 @@ The first start fills the labeled table TabPFN learns from, which takes a couple
 For development, `docker compose up mongo seed` then `npm run dev`.
 Checks: `npm test`, `npm run typecheck`, `npm run lint --prefix web`, and `npm run batch` to score the reader against the hand labels.
 
-## Data and limits
-
-The dataset is two CSV files in `data/`: 59 ML professors from NeurIPS 2024 and 2025 last authors, plus 17 who state they are not recruiting, every page read by hand on 2026-10-13.
-Only NSF grants are checked, the labels cover machine learning only, and publication lag means the score is about capacity, not an open slot.
-Nothing is ever emailed on your behalf.
-
 Contributions are welcome, and a careful new label is the most useful one.
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
