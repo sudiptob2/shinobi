@@ -14,10 +14,20 @@ Live at https://askshinobi.tech
 
 ## Why
 
-Most emails to professors go unanswered, and a big reason is that much of any shortlist is professors who are not taking students this cycle.
-Their page does not say so, or says it with a note from years ago.
-I read the pages of 59 machine learning professors by hand: 30 said they were taking students, 4 said no, 25 said nothing.
-Several of the 30 had stale notes or a publication record that did not look like a group with open seats.
+When I was applying for a PhD, I made a list of professors whose work I liked and emailed them one by one.
+Most of them never replied.
+At first I thought my emails were the problem.
+Then I looked closer at the list and saw that many of those professors were simply not taking new students that year.
+Some of their pages said nothing about it.
+Some said "I am always looking for students", but the note was three or four years old.
+There was no way to know before sending the email.
+
+That made me think this is something every prospective student runs into.
+We all spend weeks writing to people who were never going to say yes, and the professors who are actually recruiting get lost in the same pile.
+
+To check how common it is, I read the faculty and lab pages of 59 machine learning professors by hand.
+Thirty said they were taking students, four said they were not, and twenty-five said nothing at all.
+Even among the thirty who said yes, several had old notes, and several more had a publication record that did not look like a group with room for new students.
 
 ## How it works
 
