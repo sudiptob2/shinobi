@@ -1,0 +1,38 @@
+# Render blueprint: one web service built from the Dockerfile.
+# Secrets are entered in the Render dashboard (sync: false). Deploys are triggered by CI through the deploy hook.
+services:
+  - type: web
+    name: shinobi
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /app/me
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4111"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: shinobi
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SERPAPI_API_KEY
+        sync: false
+      - key: PRIORLABS_API_KEY
+        sync: false
+      - key: GEMMA_BASE_URL
+        sync: false
+      - key: GEMMA_API_KEY
+        sync: false
+      - key: GEMMA_MODEL
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: OPENALEX_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

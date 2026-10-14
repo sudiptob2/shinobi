@@ -2,7 +2,7 @@
   "name": "shinobi",
   "version": "0.1.0",
   "private": true,
-  "description": "Taking students? Ranks a shortlist of professors by likelihood of accepting new PhD students.",
+  "description": "Is this professor taking PhD students? Reads their page, their grants and their publications and gives a verdict.",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
@@ -11,8 +11,8 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
-    "features": "node --env-file=.env scripts/features.ts",
-    "batch": "node --env-file=.env scripts/batch.ts",
+    "features": "node --env-file-if-exists=.env scripts/features.ts",
+    "batch": "node --env-file-if-exists=.env scripts/batch.ts",
     "typecheck": "tsc",
     "test": "node --test 'src/**/*.test.ts' 'web/src/*.test.ts'"
   },

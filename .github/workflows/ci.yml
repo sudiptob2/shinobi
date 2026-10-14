@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix web
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          SESSION_SECRET: ci
+      - run: npm run lint --prefix web
+      - run: npm run build --prefix web
+      - run: docker build -t shinobi .
+
+  # Deploys come from here, not from Render watching the branch, so nothing ships that failed the checks above.
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "RENDER_DEPLOY_HOOK is not set, skipping"; exit 0; fi
+          curl -fsS -X POST "$HOOK"

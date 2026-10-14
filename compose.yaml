@@ -1,0 +1,39 @@
+# Local stack: Mongo plus the app. Add `--profile gemma` to run the page reader on a local Gemma through Ollama.
+#   docker compose up --build            app on http://localhost:4111
+#   docker compose run --rm app npm run features    fill the labeled table once, so scoring works
+services:
+  mongo:
+    image: mongo:8
+    ports: ["27017:27017"]
+    volumes: [mongo:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    ports: ["4111:4111"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: shinobi
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # Optional: a local Gemma for the page reader. Point the app at it with
+  # GEMMA_BASE_URL=http://ollama:11434/v1  GEMMA_MODEL=gemma3:4b  GEMMA_API_KEY=ollama
+  ollama:
+    image: ollama/ollama
+    profiles: [gemma]
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 3 && ollama pull ${OLLAMA_MODEL:-gemma3:4b} && wait"]
+
+volumes:
+  mongo:
+  ollama:
