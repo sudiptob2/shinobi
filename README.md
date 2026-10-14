@@ -28,6 +28,10 @@ To check how common it is, I read the faculty and lab pages of 59 machine learni
 Thirty said they were taking students, four said they were not, and **twenty-five said nothing at all**.
 Even among the thirty who said yes, several had old notes, and several more had a publication record that did not look like a group with room for new students.
 
+So I built Shinobi.
+It is an AI agent that does the checking for you: it finds the professor's page, reads what it says and *how old it is*, looks up their recent grants, and studies their publication record for signs of a group that takes students, such as how many new first authors appear each year and how many students have finished recently.
+It puts all of that together into **one verdict**, with the professor's own words and the numbers behind it, so you know who is worth an email *before you write it*.
+
 ## How it works
 
 ![Architecture](docs/architecture.png)
