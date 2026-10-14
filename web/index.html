@@ -8,8 +8,8 @@
     <title>Shinobi</title>
     <meta name="description" content="Is this professor taking PhD students? Shinobi reads their page and quotes them, or predicts from their publication record." />
     <script>
-      // pick the theme before first paint: the saved choice, else the system setting
-      try { document.documentElement.dataset.theme = localStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch {}
+      // pick the theme before first paint: the saved choice, else dark
+      try { document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark"; } catch { document.documentElement.dataset.theme = "dark"; }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500&display=swap" />
