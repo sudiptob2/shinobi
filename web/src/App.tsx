@@ -5,7 +5,8 @@ import type { Filter } from "./verdict";
 import { Logo } from "./Logo";
 
 const STEPS = ["parse", "locate", "read", "grants", "infer", "save"];
-const EXAMPLES = ["Benjamin Eysenbach, Princeton", "Natasha Jaques, University of Washington", "Anwar Haque, Western University"];
+type Theme = "light" | "dark";
+const currentTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 const STACK: [string, string, string, string][] = [
   ["Mastra", "Agent workflow", "https://mastra.ai", "/logos/mastra.svg"],
   ["Gemma", "Reads the pages", "https://ai.google.dev/gemma", "/logos/gemma.svg"],
@@ -26,6 +27,13 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>("all");
   const [view, setView] = useState<"search" | "history">("search");
   const [menu, setMenu] = useState(false);
+  const [theme, setTheme] = useState<Theme>(currentTheme);
+  const flipTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch { /* private mode */ }
+    setTheme(next);
+  };
 
   const [query, setQuery] = useState("");
   const [running, setRunning] = useState(false);
@@ -110,6 +118,11 @@ export default function App() {
       <header className="top">
         <button className="brand" onClick={home} aria-label="Home"><Logo size={24} /></button>
         <nav>
+          <button className="icon" onClick={flipTheme} title={theme === "dark" ? "Light mode" : "Dark mode"} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            {theme === "dark"
+              ? <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+              : <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
+          </button>
           {view !== "search" && <button className="icon" onClick={home} title="Check a professor" aria-label="Check a professor">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           </button>}
@@ -132,26 +145,17 @@ export default function App() {
       <main className="main">
         {view === "search" && (<>
         <div className="hero">
-          <span className="eyebrow">Before you email</span>
           <h1>Is this professor taking PhD students?</h1>
           <form className="cmd" onSubmit={run}>
-            <span className="caret">❯</span>
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Professor name and university, or a faculty page URL" aria-label="Professor name or page URL" disabled={running} autoFocus />
             <button disabled={running || !query.trim()}>{running ? "Checking" : "Check"}</button>
           </form>
-          <div className="cmd-hint">
-            <span>Their page, their publications, their grants. A verdict in 30 seconds.</span>
-          </div>
-          {!active && (
-            <div className="examples">
-              {EXAMPLES.map((q, i) => <button key={q} type="button" onClick={() => runQuery(q)} disabled={running}>{i === 0 ? "Try: " : ""}{q}</button>)}
-            </div>
-          )}
+          <div className="cmd-hint">Their page, their publications, their grants. A verdict in 30 seconds.</div>
         </div>
 
         <div className="scroll">
           {active && (
-            <div className="result"><Result steps={steps} running={running} verdict={verdict} error={error} total={total} /></div>
+            <Result steps={steps} running={running} verdict={verdict} error={error} total={total} />
           )}
           {history.length > 0 && (
             <section className="recent">

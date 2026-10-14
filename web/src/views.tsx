@@ -37,7 +37,7 @@ export function SignIn({ onSubmit }: { onSubmit: (mode: "signin" | "signup", ema
   return (
     <div className="auth">
       <aside className="auth-brand">
-        <Logo size={32} ink="#2a2170" />
+        <Logo size={32} />
         <div className="auth-pitch">
           <h1>Email fewer professors,<br />better.</h1>
           <ul>
@@ -72,7 +72,7 @@ export function SignIn({ onSubmit }: { onSubmit: (mode: "signin" | "signup", ema
   );
 }
 
-/* ---------- result card: step cells on top, verdict in the body, details on click ---------- */
+/* ---------- result: the card, then the six steps as one line under it ---------- */
 
 export type Step = { id: string; state: "wait" | "on" | "done" | "fail" | "skip"; detail?: string; link?: string; ms?: number };
 
@@ -80,70 +80,63 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
   const [open, setOpen] = useState(false);
   const t = verdict ? tone(verdict) : "n";
   const src = verdict?.stated?.sourceUrl ?? verdict?.pageUrl;
+  // under the trace while running: the failed step, else the latest finished step's detail
+  const current = steps.find((s) => s.state === "fail") ?? [...steps].reverse().find((s) => s.state === "done" && s.detail);
   return (
-    <div className="one" aria-live="polite">
-      <div className="tl">
-        {steps.map((s) => (
-          <div key={s.id} className={s.state}>
-            <b><i />{s.id}{s.ms != null && s.ms > 0 ? ` ${(s.ms / 1000).toFixed(1)}s` : ""}</b>
-            <span title={s.detail}>{s.detail ?? ""}{s.link && <a href={s.link} target="_blank" rel="noreferrer">{host(s.link)}</a>}</span>
-          </div>
-        ))}
-      </div>
-
-      {error && <div className="vd err-row" role="alert">{error}</div>}
-
-      {!error && !verdict && <div className="vd waiting">{running ? "Checking. This takes 5 to 30 seconds." : ""}</div>}
-
-      {verdict && (
-        <>
-          <div className="vd">
-            <div>
-              <b className="n">{verdict.name}</b>
-              <small>{verdict.affiliation ?? host(verdict.pageUrl)}</small>
-              {verdict.stated && <div className={`quote ${t}`}>"{verdict.stated.quote}"</div>}
+    <div className="result" aria-live="polite">
+      <div className="one">
+        {error && <div className="vd err-row" role="alert">{error}</div>}
+        {!error && !verdict && <div className="vd waiting">{running ? "Checking. This takes 5 to 30 seconds." : ""}</div>}
+        {verdict && (
+          <>
+            <div className="vd">
+              <div className="who">
+                <div><b className="n">{verdict.name}</b><small>{verdict.affiliation ?? host(verdict.pageUrl)}</small></div>
+                <span className={`pill ${t}`}><i />{label(verdict)}</span>
+              </div>
+              {verdict.stated && <div className={`quote ${t}`}>“{verdict.stated.quote}”</div>}
               {!verdict.stated && verdict.note && <div className="note">{verdict.note}</div>}
               {verdict.inferred ? (
                 <div className="gauge">
-                  <span className="lbl">Publication record</span>
                   <span className="num">{pct(verdict.inferred.probability)}</span>
-                  <div className="bar"><i style={{ width: pct(verdict.inferred.probability) }} /></div>
                   <span className="why">{recordLine(verdict)}</span>
+                  <div className={`bar ${recordTone(verdict.inferred.probability)}`}><i style={{ width: pct(verdict.inferred.probability) }} /></div>
                 </div>
               ) : (
                 <div className="why">{verdict.stated ? "Publications not scored: " : ""}{verdict.reason}</div>
               )}
             </div>
-            <div className="pills">
-              <span className={`pill ${t}`}><i />{label(verdict)}</span>
-              {verdict.inferred && <span className={`pill ${recordTone(verdict.inferred.probability)} soft`}><i />Publications {pct(verdict.inferred.probability)}</span>}
-            </div>
-          </div>
-          <button className="more" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-            <span>{src ? <>Source: <a href={src} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{host(src)}</a></> : "No page"}{total > 0 && <> · {(total / 1000).toFixed(1)}s</>}</span>
-            <span className="toggle">{open ? "Less" : "Why this score"}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={open ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} /></svg></span>
-          </button>
-          {open && (
-            <div className="details">
-              {verdict.inferred && (
-                <>
-                  <div className="expl">{(verdict.explanation ?? []).map((line, i) => <p key={i}>{line}</p>)}</div>
-                  <div className="feat">
-                    {Object.entries(verdict.inferred.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
-                  </div>
-                  {!!verdict.grants?.length && (
-                    <div className="grants">
-                      <span className="lbl">NSF awards</span>
-                      {verdict.grants.map((g, i) => <div key={i}><span>{g.title}</span><b>{g.start.slice(0, 4)}–{g.end.slice(0, 4)} · ${g.amount >= 1e6 ? (g.amount / 1e6).toFixed(1) + "M" : Math.round(g.amount / 1e3) + "k"}</b></div>)}
+            <button className="more" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+              <span>{src ? <>Source <a className="link" href={src} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{host(src)}</a></> : "No page"}</span>
+              <span className="toggle">{open ? "Less" : "Why this score"}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={open ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} /></svg></span>
+            </button>
+            {open && (
+              <div className="details">
+                {verdict.inferred && (
+                  <>
+                    <div className="expl">{(verdict.explanation ?? []).map((line, i) => <p key={i}>{line}</p>)}</div>
+                    <div className="feat">
+                      {Object.entries(verdict.inferred.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
                     </div>
-                  )}
-                </>
-              )}
-              <div className="why mono">Checked {verdict.checkedAt.slice(0, 10)}{verdict.openalexId && <> · OpenAlex {verdict.openalexId}</>}</div>
-            </div>
-          )}
-        </>
-      )}
+                    {!!verdict.grants?.length && (
+                      <div className="grants">
+                        <span className="lbl">NSF awards</span>
+                        {verdict.grants.map((g, i) => <div key={i}><span>{g.title}</span><b>{g.start.slice(0, 4)}–{g.end.slice(0, 4)} · ${g.amount >= 1e6 ? (g.amount / 1e6).toFixed(1) + "M" : Math.round(g.amount / 1e3) + "k"}</b></div>)}
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="meta">Checked {verdict.checkedAt.slice(0, 10)}{verdict.openalexId && <> · OpenAlex {verdict.openalexId}</>}</div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <div className="trace">
+        {steps.map((s) => <span key={s.id} className={s.state} title={s.detail}>{s.id}</span>)}
+        {total > 0 && <span className="t">{(total / 1000).toFixed(1)}s</span>}
+      </div>
+      {current?.detail && !verdict && <div className="trace-detail">{current.detail}{current.link && <> <a className="link" href={current.link} target="_blank" rel="noreferrer">{host(current.link)}</a></>}</div>}
     </div>
   );
 }
@@ -176,7 +169,7 @@ export function Table({ title, note, empty, rows, filter, onFilter, onPick, limi
                 <td><span className={`pill ${tone(v)}`}><i />{label(v)}</span></td>
                 <td className="p">{v.inferred ? v.inferred.probability.toFixed(2) : ""}</td>
                 <td className="e">
-                  {v.stated && <>"{v.stated.quote}"<a href={v.stated.sourceUrl} target="_blank" rel="noreferrer">{host(v.stated.sourceUrl)}</a></>}
+                  {v.stated && <>“{v.stated.quote}”<a className="link" href={v.stated.sourceUrl} target="_blank" rel="noreferrer">{host(v.stated.sourceUrl)}</a></>}
                   {!v.stated && v.inferred && <>Nothing stated. {fmt("x", v.inferred.features.new_first_authors_rate)} new first authors a year, cohort of {v.inferred.features.junior_cohort}, {v.inferred.features.outflow} finished recently.</>}
                   {!v.stated && !v.inferred && v.reason}
                 </td>
