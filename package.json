@@ -13,10 +13,10 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start",
-    "features": "node --env-file-if-exists=.env scripts/features.ts",
     "batch": "node --env-file-if-exists=.env scripts/batch.ts",
     "typecheck": "tsc",
-    "test": "node --test 'src/**/*.test.ts' 'web/src/*.test.ts'"
+    "test": "node --test 'src/**/*.test.ts' 'web/src/*.test.ts'",
+    "judge": "node --env-file-if-exists=.env scripts/judge.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.95",

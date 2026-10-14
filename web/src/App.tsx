@@ -9,8 +9,7 @@ type Theme = "light" | "dark";
 const currentTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 const STACK: [string, string, string, string][] = [
   ["Mastra", "Agent workflow", "https://mastra.ai", "/logos/mastra.svg"],
-  ["Gemma", "Reads the pages", "https://ai.google.dev/gemma", "/logos/gemma.svg"],
-  ["TabPFN", "Scores the publication record", "https://priorlabs.ai", "/logos/priorlabs.png"],
+  ["Gemma", "Reads the pages, judges the record", "https://ai.google.dev/gemma", "/logos/gemma.svg"],
   ["OpenAlex", "Publication data", "https://openalex.org", "/logos/openalex.png"],
   ["SerpApi", "Finds the page", "https://serpapi.com", "/logos/serpapi.svg"],
   ["MongoDB Atlas", "Accounts, checks and workflow state", "https://www.mongodb.com/atlas", "/logos/mongodb.svg"],
@@ -51,7 +50,7 @@ export default function App() {
     clear();
     setView("search");
     setVerdict(v);
-    setSteps(STEPS.map((id) => ({ id, state: "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "grants" ? (v.grants?.length ? `${v.grants.length} NSF award${v.grants.length > 1 ? "s" : ""}` : "No NSF award found") : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.inferred ? `TabPFN: ${v.inferred.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
+    setSteps(STEPS.map((id) => ({ id, state: "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "grants" ? (v.grants?.length ? `${v.grants.length} NSF award${v.grants.length > 1 ? "s" : ""}` : "No NSF award found") : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.inferred ? `Gemma: ${v.inferred.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
   };
   // the search page opens on the latest check when there is one
   const home = () => { if (history[0]) show(history[0].verdict); else { clear(); setView("search"); } };
@@ -82,7 +81,7 @@ export default function App() {
         const real = (o.grants ?? []).filter((g: any) => g.amount >= 50000);
         patch("grants", { state: "done", ms, detail: real.length ? `${real.length} NSF award${real.length > 1 ? "s" : ""}, latest ${real[0].start.slice(0, 4)}` : "No NSF award found" });
       } else if (e.step === "infer") {
-        patch("infer", { state: "done", ms, detail: o.inferred ? `OpenAlex ${o.openalexId}, TabPFN: ${o.inferred.probability.toFixed(2)}` : o.reason ?? "" });
+        patch("infer", { state: "done", ms, detail: o.inferred ? `OpenAlex ${o.openalexId}, Gemma: ${o.inferred.probability.toFixed(2)}` : o.reason ?? "" });
       } else if (e.step === "save") patch("save", { state: "done", ms, detail: "Saved to your checks" });
     } else if (e.type === "verdict") {
       setVerdict(e.verdict);

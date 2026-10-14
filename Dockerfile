@@ -17,7 +17,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/.mastra/output .mastra/output
 COPY --from=build /app/web/dist web/dist
-# the labeled table and the scripts that load it, so `npm run features` works inside the container
+# the labeled professors and the benchmark scripts, so `npm run batch` and `npm run judge` work inside the container
 COPY data data
 COPY scripts scripts
 COPY src src

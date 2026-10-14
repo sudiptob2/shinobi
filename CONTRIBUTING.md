@@ -11,7 +11,7 @@ You need Docker, Node 22 or newer, and the keys listed in the README.
 ```
 git clone https://github.com/sudiptob2/shinobi && cd shinobi
 cp .env.example .env            # fill in the keys
-docker compose up mongo seed    # Mongo, with the labeled table filled
+docker compose up mongo          # Mongo
 npm install && npm install --prefix web
 npm run dev                     # the Mastra server on http://localhost:4111
 ```
@@ -65,7 +65,7 @@ The design rules that keep the code small:
 
 ## Adding a labeled professor
 
-The labeled table is what TabPFN learns from, so a careful label is the most valuable contribution there is.
+The labeled professors are the benchmark for both the reader and the record score, so a careful label is the most valuable contribution there is.
 
 1. Read the professor's faculty page and lab page yourself.
 2. Add a row to `data/shortlist.csv` or, for a professor who states they are not taking students, `data/negatives.csv`, following the existing columns.
@@ -73,8 +73,7 @@ The labeled table is what TabPFN learns from, so a careful label is the most val
    Copy the statement verbatim with its URL, and record the date you read it.
    A statement for a past cycle, or dated more than a year ago, counts as `unstated`.
 3. Find the professor's OpenAlex author id at https://openalex.org and fill `openalex_id`.
-4. Run `npm run features -- --refresh` to pull the features for the new row.
-5. Mention the hand-label agreement from `npm run batch` in the pull request.
+4. Mention the agreement from `npm run batch` (the reader) and `npm run judge` (the record score) in the pull request.
 
 ## Reporting a wrong verdict
 

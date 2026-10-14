@@ -1,23 +1,25 @@
 // OpenAlex: fetch an author's works and turn them into the publication features
-// the predictor sees, plus the alphabetical-order flag that disables it.
+// the record judge sees, plus the alphabetical-order flag that disables it.
 import { schoolWords, words } from "./text.ts";
 
-export type Work = {
-  publication_year: number;
-  authorships: { author: { id: string | null; display_name: string } }[];
+export type Authorship = {
+  author: { id: string | null; display_name: string };
+  author_position?: "first" | "middle" | "last";
+  institutions?: { id: string; display_name?: string; type?: string }[];
 };
+export type Work = { publication_year: number; authorships: Authorship[] };
 
 export type Features = {
-  new_first_authors_rate: number; // new distinct first authors per year, mean of last 3 years
-  new_first_authors_trend: number; // last 3 years minus the 3 before
-  junior_cohort: number; // juniors with a paper in the last 2 years
-  outflow: number; // juniors whose last paper was 1 to 2 years ago
+  last_author_rate: number; // share of papers in the last 3 years with the professor as last author, the advisor position
+  students_active: number; // students with a paper in the last 2 years (a student: shares the professor's institution, led a paper with them, started within 6 years)
+  students_new_2y: number; // students who started in the last 2 years
+  students_left: number; // students whose last paper with the professor was 2 to 3 years ago
+  group_size_2y: number; // distinct same-institution coauthors in the last 2 years
   pub_rate: number; // papers per year, last 3 years
-  pub_rate_trend: number; // last 3 years minus the 3 before
   career_years: number; // since first paper
   years_since_last: number; // since most recent paper
   active_grants: number; // NSF awards of $50k or more still running
-  months_since_grant: number; // since the latest such award started, capped at 120
+  industry_share: number; // share of the professor's own authorships in the last 2 years that list a company
 };
 
 const API = "https://api.openalex.org";
@@ -96,48 +98,42 @@ export function isAlphabetical(works: Work[]): boolean {
   return sorted.length / multi.length > 0.5;
 }
 
-export function computeFeatures(works: Work[], authorId: string, year: number, careerStart?: number | null, grants = { active_grants: 0, months_since_grant: 120 }): Features {
+export function computeFeatures(works: Work[], authorId: string, year: number, careerStart?: number | null, grants: { active_grants: number } = { active_grants: 0 }): Features {
   const me = `https://openalex.org/${authorId}`;
-  const byYear = [...works].sort((a, b) => a.publication_year - b.publication_year);
-  const years = byYear.map((w) => w.publication_year);
+  const mine = (w: Work) => w.authorships.find((a) => a.author.id === me);
+  const years = works.map((w) => w.publication_year).sort((a, b) => a - b);
   const first = careerStart ?? years[0] ?? year, last = years.at(-1) ?? year;
+  const recent3 = works.filter((w) => w.publication_year >= year - 2), recent2 = works.filter((w) => w.publication_year >= year - 1);
 
-  // first authors other than me, in order of first appearance
-  const seen = new Set<string>();
-  const newFirstByYear = new Map<number, number>();
-  const firstYear = new Map<string, number>(), lastYear = new Map<string, number>();
-  for (const w of byYear) {
-    const fa = w.authorships[0]?.author;
-    if (!fa?.id || fa.id === me) continue;
-    firstYear.set(fa.id, Math.min(firstYear.get(fa.id) ?? Infinity, w.publication_year));
-    lastYear.set(fa.id, Math.max(lastYear.get(fa.id) ?? -Infinity, w.publication_year));
-    if (!seen.has(fa.id)) {
-      seen.add(fa.id);
-      newFirstByYear.set(w.publication_year, (newFirstByYear.get(w.publication_year) ?? 0) + 1);
-    }
+  // home: the university that appears most on the professor's own recent authorships (the author record itself is too noisy)
+  const count = new Map<string, number>();
+  for (const w of recent3) for (const i of mine(w)?.institutions ?? []) if (i.type === "education") count.set(i.id, (count.get(i.id) ?? 0) + 1);
+  const home = [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const atHome = (a: Authorship) => !home || (a.institutions ?? []).some((i) => i.id === home);
+
+  // every coauthor: first and last year with the professor, whether they ever led a paper, whether they ever shared the home institution
+  const firstYear = new Map<string, number>(), lastYear = new Map<string, number>(), led = new Set<string>(), homeEver = new Set<string>();
+  for (const w of works) for (const a of w.authorships) {
+    const id = a.author.id;
+    if (!id || id === me) continue;
+    firstYear.set(id, Math.min(firstYear.get(id) ?? Infinity, w.publication_year));
+    lastYear.set(id, Math.max(lastYear.get(id) ?? -Infinity, w.publication_year));
+    if (a.author_position === "first") led.add(id);
+    if (atHome(a)) homeEver.add(id);
   }
-  const mean = (m: Map<number, number>, from: number, to: number) => {
-    let s = 0;
-    for (let y = from; y <= to; y++) s += m.get(y) ?? 0;
-    return s / (to - from + 1);
-  };
-  const papersByYear = new Map<number, number>();
-  for (const y of years) papersByYear.set(y, (papersByYear.get(y) ?? 0) + 1);
-
-  // a junior is a first author whose first paper with me is within the last 6 years
-  const juniors = [...firstYear].filter(([, fy]) => fy >= year - 6).map(([id]) => id);
-  const junior_cohort = juniors.filter((id) => lastYear.get(id)! >= year - 2).length;
-  const outflow = juniors.filter((id) => { const ly = lastYear.get(id)!; return ly >= year - 2 && ly <= year - 1; }).length;
+  const students = [...firstYear].filter(([id, fy]) => fy >= year - 6 && led.has(id) && homeEver.has(id)).map(([id]) => id);
+  const lastAuthor = recent3.filter((w) => mine(w)?.author_position === "last").length;
 
   return {
-    new_first_authors_rate: mean(newFirstByYear, year - 2, year),
-    new_first_authors_trend: mean(newFirstByYear, year - 2, year) - mean(newFirstByYear, year - 5, year - 3),
-    junior_cohort,
-    outflow,
-    pub_rate: mean(papersByYear, year - 2, year),
-    pub_rate_trend: mean(papersByYear, year - 2, year) - mean(papersByYear, year - 5, year - 3),
+    last_author_rate: recent3.length ? lastAuthor / recent3.length : 0,
+    students_active: students.filter((id) => lastYear.get(id)! >= year - 1).length,
+    students_new_2y: students.filter((id) => firstYear.get(id)! >= year - 1).length,
+    students_left: students.filter((id) => { const ly = lastYear.get(id)!; return ly >= year - 3 && ly <= year - 2; }).length,
+    group_size_2y: new Set(recent2.flatMap((w) => w.authorships.filter((a) => a.author.id && a.author.id !== me && atHome(a)).map((a) => a.author.id!))).size,
+    pub_rate: recent3.length / 3,
     career_years: year - first,
     years_since_last: year - last,
-    ...grants,
+    active_grants: grants.active_grants,
+    industry_share: recent2.length ? recent2.filter((w) => (mine(w)?.institutions ?? []).some((i) => i.type === "company")).length / recent2.length : 0,
   };
 }

@@ -1,4 +1,4 @@
-# Local stack: Mongo, a one-off seed of the labeled table, then the app on http://localhost:4111.
+# Local stack: Mongo, then the app on http://localhost:4111.
 #   docker compose up --build
 x-app: &app
   build: .
@@ -20,21 +20,12 @@ services:
       timeout: 5s
       retries: 12
 
-  # Pulls OpenAlex and NSF data for the 76 labeled professors, which TabPFN learns from.
-  # Takes a couple of minutes the first time and is skipped once the table is full.
-  seed:
-    <<: *app
-    command: ["npm", "run", "features"]
-    depends_on:
-      mongo:
-        condition: service_healthy
-
   app:
     <<: *app
     ports: ["4111:4111"]
     depends_on:
-      seed:
-        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
 
 volumes:
   mongo:

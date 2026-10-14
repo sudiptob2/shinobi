@@ -15,7 +15,7 @@ export const Verdict = z.object({
       sourceUrl: z.string().url(),
     })
     .optional(),
-  // inferred: TabPFN probability over the publication and grant features
+  // inferred: Gemma's probability from the publication and grant features
   inferred: z
     .object({
       probability: z.number().min(0).max(1),

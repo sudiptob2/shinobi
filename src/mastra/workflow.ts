@@ -7,8 +7,8 @@ import { findFacultyPage } from "./tools/serpapi.ts";
 import { readSite } from "./tools/page.ts";
 import { parseQuery, readPages, Reading } from "./tools/gemma.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, findAuthor, isAlphabetical } from "./tools/openalex.ts";
-import { predict } from "./tools/tabpfn.ts";
-import { explain, reference } from "./tools/explain.ts";
+import { explain } from "./tools/explain.ts";
+import { judgeRecord } from "./tools/judge.ts";
 import { fetchGrants, Grant, grantFeatures, grantLine } from "./tools/grants.ts";
 
 const Input = z.object({
@@ -99,7 +99,7 @@ const grants = createStep({
   execute: async ({ inputData: d }) => ({ ...d, grants: await fetchGrants(d.name, d.affiliation).catch(() => []) }),
 });
 
-// Every professor gets the publication score, stated or not. A stated "yes" with a weak record is the case a student most needs to see.
+// Every professor gets the record score, stated or not. A stated "yes" with a weak record is the case a student most needs to see.
 const infer = createStep({
   id: "infer",
   inputSchema: WithGrants,
@@ -117,11 +117,11 @@ const infer = createStep({
       if ("reason" in author) return { reason: author.reason };
       const works = await fetchWorks(author.id);
       if (works.length < 5) return { reason: `OpenAlex has only ${works.length} papers for this author since 2008, too few to score.`, openalexId: author.id };
-      if (isAlphabetical(works)) return { reason: "This professor's papers list authors alphabetically, so first authorship carries no signal about students.", openalexId: author.id };
+      if (isAlphabetical(works)) return { reason: "This professor's papers list authors alphabetically, so author order says nothing about who leads a paper or who the students are.", openalexId: author.id };
       const gf = grantFeatures(d.grants);
       const features = computeFeatures(works, author.id, new Date().getFullYear(), await fetchFirstYear(author.id), gf);
-      const probability = await predict(features);
-      const explanation = explain(features, probability, await reference(), stated?.status);
+      const probability = await judgeRecord(features);
+      const explanation = explain(features, probability, stated?.status);
       explanation.splice(explanation.length - 1, 0, grantLine(d.grants, gf, d.affiliation));
       return { inferred: { probability, features: { ...features } }, openalexId: author.id, explanation, grants: d.grants.filter((g) => g.amount >= 50000).slice(0, 5) };
     };

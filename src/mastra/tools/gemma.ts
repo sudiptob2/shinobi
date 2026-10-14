@@ -62,13 +62,13 @@ export function applyStaleness(r: Reading, year: number): Reading {
   return { ...r, status: "unstated", stale: `${r.status === "recruiting" ? "A recruiting" : "A not-recruiting"} note dated ${when} was found and ignored as out of date: "${r.quote}"` };
 }
 
-/** Ask the reader for one JSON object. Google AI Studio returns intermittent 500s on Gemma; the SDK's own retries are not enough. */
-async function generateJson<T>(prompt: string, parse: (raw: unknown) => T): Promise<T> {
+/** Ask an agent for one JSON object. Hosted Gemma endpoints return intermittent 500s; the SDK's own retries are not enough. */
+export async function generateJson<T>(agent: Agent, prompt: string, parse: (raw: unknown) => T, settings?: { temperature?: number }): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
-      const res = await reader.generate(prompt);
+      const res = await agent.generate(prompt, { modelSettings: settings });
       const json = res.text.match(/\{[\s\S]*\}/)?.[0];
-      if (!json) throw new Error(`The reader returned no JSON: ${res.text.slice(0, 200)}`);
+      if (!json) throw new Error(`${agent.name} returned no JSON: ${res.text.slice(0, 200)}`);
       return parse(JSON.parse(json));
     } catch (e) {
       if (attempt >= 4) throw e;
@@ -81,7 +81,7 @@ async function generateJson<T>(prompt: string, parse: (raw: unknown) => T): Prom
 
 export async function readPages(name: string, pages: { url: string; text: string }[]): Promise<Reading> {
   const year = new Date().getFullYear();
-  return applyStaleness(await generateJson(PROMPT(name, year, pages), (raw) => Reading.parse(raw)), year);
+  return applyStaleness(await generateJson(reader, PROMPT(name, year, pages), (raw) => Reading.parse(raw)), year);
 }
 
 // Short forms students type that are too short to match an institution name on OpenAlex or NSF.
@@ -95,7 +95,7 @@ const ALIASES: Record<string, string> = {
 
 /** Split free text like "Pam Bishop Western" into the person and the institution. */
 export async function parseQuery(query: string): Promise<{ name: string; affiliation?: string }> {
-  const p = await generateJson(`A student typed this into a box that asks for a professor's name and university:
+  const p = await generateJson(reader, `A student typed this into a box that asks for a professor's name and university:
 "${query}"
 Split it into the person and the institution. A person's name is two or three words; anything else is the institution, including short forms and nicknames of universities (Western, Brock, Penn, MIT, CMU, UWO, UofT, Mila). Keep the student's spelling. Do not add a university that was not typed. Titles and degrees (Dr., Prof., PhD, MD, Professor) are not an institution and not part of the name.
 Examples:
