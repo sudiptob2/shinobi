@@ -4,7 +4,7 @@ import { features, models, professors } from "../db.ts";
 import type { Features } from "./openalex.ts";
 
 const API = "https://api.priorlabs.ai/tabpfn";
-export const COLUMNS: (keyof Features)[] = ["new_first_authors_rate", "new_first_authors_trend", "junior_cohort", "outflow", "pub_rate", "pub_rate_trend", "career_years", "years_since_last"];
+export const COLUMNS: (keyof Features)[] = ["new_first_authors_rate", "new_first_authors_trend", "junior_cohort", "outflow", "pub_rate", "pub_rate_trend", "career_years", "years_since_last", "active_grants", "months_since_grant"];
 
 async function call<T>(path: string, body: unknown): Promise<T> {
   const r = await fetch(`${API}/${path}`, {

@@ -25,6 +25,7 @@ test("features: new first authors, cohort, outflow, trends", () => {
   assert.equal(f.junior_cohort, 3);                          // S1, S2, S3 all active since 2024
   assert.equal(f.outflow, 2);                                // S1 last 2025, S2 last 2024
   assert.equal(f.pub_rate, 4 / 3);
+  assert.equal(f.active_grants, 0);
 });
 
 test("alphabetical detection", () => {

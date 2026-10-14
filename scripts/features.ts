@@ -4,6 +4,7 @@ import { readCsv } from "../src/mastra/csv.ts";
 import { parse } from "node:path";
 import { features } from "../src/mastra/db.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, isAlphabetical } from "../src/mastra/tools/openalex.ts";
+import { fetchGrants, grantFeatures } from "../src/mastra/tools/grants.ts";
 
 const YEAR = new Date().getFullYear();
 
@@ -16,10 +17,12 @@ let n = 0;
 for (const r of rows) {
   const works = await fetchWorks(r.openalex_id);
   const firstYear = await fetchFirstYear(r.openalex_id);
+  const grants = await fetchGrants(r.name, r.affiliation).catch(() => []);
   const doc = {
     openalexId: r.openalex_id,
     name: r.name,
-    features: computeFeatures(works, r.openalex_id, YEAR, firstYear),
+    features: computeFeatures(works, r.openalex_id, YEAR, firstYear, grantFeatures(grants)),
+    grants: grants.filter((g) => g.amount >= 50000).slice(0, 5),
     alphabetical: isAlphabetical(works),
     status: r.status || null,
     works: works.length,

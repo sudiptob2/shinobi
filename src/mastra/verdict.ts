@@ -22,6 +22,7 @@ export const Verdict = z.object({
     })
     .optional(),
   explanation: z.array(z.string()).optional(), // why the record scored this way, one sentence per driver
+  grants: z.array(z.object({ title: z.string(), start: z.string(), end: z.string(), amount: z.number(), awardee: z.string() })).optional(), // NSF awards of $50k or more, latest first
   // not_scored: the reason is the output
   reason: z.string().optional(),
   openalexId: z.string().optional(),

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { explain } from "./explain.ts";
 
 const ref = { yes: { new_first_authors_rate: 4 }, no: { new_first_authors_rate: 2 } };
-const base = { new_first_authors_rate: 6, new_first_authors_trend: 2, junior_cohort: 20, outflow: 10, pub_rate: 10, pub_rate_trend: 1, career_years: 10, years_since_last: 0 };
+const base = { new_first_authors_rate: 6, new_first_authors_trend: 2, junior_cohort: 20, outflow: 10, pub_rate: 10, pub_rate_trend: 1, career_years: 10, years_since_last: 0, active_grants: 0, months_since_grant: 120 };
 
 test("explanation names the drivers", () => {
   const lines = explain(base, 0.8, ref);

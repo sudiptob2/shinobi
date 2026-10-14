@@ -15,6 +15,8 @@ export type Features = {
   pub_rate_trend: number; // last 3 years minus the 3 before
   career_years: number; // since first paper
   years_since_last: number; // since most recent paper
+  active_grants: number; // NSF awards of $50k or more still running
+  months_since_grant: number; // since the latest such award started, capped at 120
 };
 
 const API = "https://api.openalex.org";
@@ -94,7 +96,7 @@ export function isAlphabetical(works: Work[]): boolean {
   return sorted.length / multi.length > 0.5;
 }
 
-export function computeFeatures(works: Work[], authorId: string, year: number, careerStart?: number | null): Features {
+export function computeFeatures(works: Work[], authorId: string, year: number, careerStart?: number | null, grants = { active_grants: 0, months_since_grant: 120 }): Features {
   const me = `https://openalex.org/${authorId}`;
   const byYear = [...works].sort((a, b) => a.publication_year - b.publication_year);
   const years = byYear.map((w) => w.publication_year);
@@ -136,5 +138,6 @@ export function computeFeatures(works: Work[], authorId: string, year: number, c
     pub_rate_trend: mean(papersByYear, year - 2, year) - mean(papersByYear, year - 5, year - 3),
     career_years: year - first,
     years_since_last: year - last,
+    ...grants,
   };
 }

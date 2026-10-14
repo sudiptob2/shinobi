@@ -9,6 +9,7 @@ import { parseQuery, readPages, Reading } from "./tools/gemma.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, findAuthor, isAlphabetical } from "./tools/openalex.ts";
 import { predict } from "./tools/tabpfn.ts";
 import { explain, reference } from "./tools/explain.ts";
+import { fetchGrants, grantFeatures, grantLine } from "./tools/grants.ts";
 
 const Input = z.object({
   query: z.string().optional(), // free text, parsed by the model
@@ -87,10 +88,22 @@ const read = createStep({
   },
 });
 
+const WithGrants = Read.extend({
+  grants: z.array(z.object({ title: z.string(), start: z.string(), end: z.string(), amount: z.number(), awardee: z.string() })),
+});
+
+// NSF awards under this name at this institution. A step of its own so the trace shows it.
+const grants = createStep({
+  id: "grants",
+  inputSchema: Read,
+  outputSchema: WithGrants,
+  execute: async ({ inputData: d }) => ({ ...d, grants: await fetchGrants(d.name, d.affiliation).catch(() => []) }),
+});
+
 // Every professor gets the publication score, stated or not. A stated "yes" with a weak record is the case a student most needs to see.
 const infer = createStep({
   id: "infer",
-  inputSchema: Read,
+  inputSchema: WithGrants,
   outputSchema: Verdict,
   execute: async ({ inputData: d }) => {
     const stated = d.reading.status !== "unstated"
@@ -106,9 +119,12 @@ const infer = createStep({
       const works = await fetchWorks(author.id);
       if (works.length < 5) return { reason: `OpenAlex has only ${works.length} papers for this author since 2008, too few to score.`, openalexId: author.id };
       if (isAlphabetical(works)) return { reason: "This professor's papers list authors alphabetically, so first authorship carries no signal about students.", openalexId: author.id };
-      const features = computeFeatures(works, author.id, new Date().getFullYear(), await fetchFirstYear(author.id));
+      const gf = grantFeatures(d.grants);
+      const features = computeFeatures(works, author.id, new Date().getFullYear(), await fetchFirstYear(author.id), gf);
       const probability = await predict(features);
-      return { inferred: { probability, features: { ...features } }, openalexId: author.id, explanation: explain(features, probability, await reference(), stated?.status) };
+      const explanation = explain(features, probability, await reference(), stated?.status);
+      explanation.splice(explanation.length - 1, 0, grantLine(d.grants, gf, d.affiliation));
+      return { inferred: { probability, features: { ...features } }, openalexId: author.id, explanation, grants: d.grants.filter((g) => g.amount >= 50000).slice(0, 5) };
     };
     const r = await scored();
     const tier = stated ? ("stated" as const) : "inferred" in r ? ("inferred" as const) : ("not_scored" as const);
@@ -130,6 +146,7 @@ export const check = createWorkflow({ id: "check", inputSchema: Input, outputSch
   .then(parse)
   .then(locate)
   .then(read)
+  .then(grants)
   .then(infer)
   .then(save)
   .commit();

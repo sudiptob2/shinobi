@@ -8,6 +8,7 @@ export type FeatureRow = {
   alphabetical: boolean;
   status?: "recruiting" | "not_recruiting" | "unstated" | null; // the hand label, when this professor is in the labeled table
   works?: number;
+  grants?: { title: string; start: string; end: string; amount: number; awardee: string }[];
   pulledAt: string;
 };
 

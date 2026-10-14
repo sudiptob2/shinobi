@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { Verdict } from "./api";
+import { Logo } from "./Logo";
 
 /* ---------- small helpers ---------- */
 
@@ -44,10 +45,26 @@ export const FEATURE_NAMES: Record<string, string> = {
   pub_rate_trend: "Change in papers per year",
   career_years: "Years since first paper",
   years_since_last: "Years since last paper",
+  active_grants: "Active NSF awards",
+  months_since_grant: "Months since the latest NSF award",
 };
 const fmt = (k: string, n: number) => (k.includes("trend") ? (n >= 0 ? "+" : "") + n.toFixed(1) : Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-/* ---------- sign in ---------- */
+/* ---------- sign in: brand panel left, form right ---------- */
+
+const POINTS = [
+  ["quote", "Quotes the professor's own page, with the link"],
+  ["chart", "Scores their publication record when nothing is said"],
+  ["refuse", "Tells you when a recruiting note is out of date"],
+  ["lock", "Keeps your checks in your account. Never emails anyone"],
+] as const;
+
+const ICONS: Record<string, string> = {
+  quote: "M4 5h7v7H4zM13 5h7v7h-7zM11 12v3a4 4 0 0 1-4 4M20 12v3a4 4 0 0 1-4 4",
+  chart: "M4 19V9M10 19V5M16 19v-7M22 19H2",
+  refuse: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2",
+  lock: "M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z",
+};
 
 export function SignIn({ onSubmit }: { onSubmit: (mode: "signin" | "signup", email: string, password: string) => Promise<void> }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -62,20 +79,38 @@ export function SignIn({ onSubmit }: { onSubmit: (mode: "signin" | "signup", ema
   };
   return (
     <div className="auth">
-      <div className="box">
-        <div className="brand"><b>Shinobi</b><span>Taking students?</span></div>
-        <p>Check whether a professor is accepting new PhD students. Your checks are saved to your account so you can come back to them.</p>
-        <form onSubmit={submit}>
-          <div className="field"><label htmlFor="email">Email</label><input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.edu" /></div>
-          <div className="field"><label htmlFor="password">Password</label><input id="password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters" /></div>
-          {error && <div className="err" role="alert">{error}</div>}
-          <button className="primary" disabled={busy}>{busy ? "One moment" : mode === "signin" ? "Sign in" : "Create account"}</button>
+      <aside className="auth-brand">
+        <Logo size={32} ink="#2a2170" />
+        <div className="auth-pitch">
+          <h1>Email fewer professors,<br />better.</h1>
+          <ul>
+            {POINTS.map(([icon, text]) => (
+              <li key={icon}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICONS[icon]} /></svg>{text}</li>
+            ))}
+          </ul>
+        </div>
+        <p className="auth-foot">© {new Date().getFullYear()} Shinobi · open source</p>
+      </aside>
+
+      <section className="auth-form">
+        <div className="box">
+          <div className="auth-mobile"><Logo size={28} /></div>
+          <div>
+            <h2>{mode === "signin" ? "Welcome back" : "Create your account"}</h2>
+            <p>{mode === "signin" ? "Sign in to see your checks and run new ones." : "Your checks are saved to your account, private to you."}</p>
+          </div>
+          <form onSubmit={submit}>
+            <div className="field"><label htmlFor="email">Email</label><input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@university.edu" /></div>
+            <div className="field"><label htmlFor="password">Password</label><input id="password" type="password" autoComplete={mode === "signup" ? "new-password" : "current-password"} required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters" /></div>
+            {error && <div className="err" role="alert">{error}</div>}
+            <button className="primary" disabled={busy}>{busy ? "One moment" : mode === "signin" ? "Sign in" : "Create account"}</button>
+          </form>
           <div className="alt">
             {mode === "signin" ? <>New here? <button type="button" onClick={() => setMode("signup")}>Create an account</button></> : <>Have an account? <button type="button" onClick={() => setMode("signin")}>Sign in</button></>}
           </div>
-        </form>
-        <div className="fine">Shinobi never emails professors on your behalf. Your history is private to your account.</div>
-      </div>
+          <p className="fine">Shinobi never emails professors on your behalf.</p>
+        </div>
+      </section>
     </div>
   );
 }
@@ -110,6 +145,7 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
               <b className="n">{verdict.name}</b>
               <small>{verdict.affiliation ?? host(verdict.pageUrl)}</small>
               {verdict.stated && <div className={`quote ${t}`}>"{verdict.stated.quote}"</div>}
+              {!verdict.stated && verdict.note && <div className="note">{verdict.note}</div>}
               {verdict.inferred ? (
                 <div className="gauge">
                   <span className="lbl">Publication record</span>
@@ -128,17 +164,22 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
           </div>
           <button className="more" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
             <span>{src ? <>Source: <a href={src} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{host(src)}</a></> : "No page"}{total > 0 && <> · {(total / 1000).toFixed(1)}s</>}</span>
-            <span>{open ? "▴ less" : "▾ details"}</span>
+            <span className="toggle">{open ? "Less" : "Why this score"}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={open ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} /></svg></span>
           </button>
           {open && (
             <div className="details">
               {verdict.inferred && (
                 <>
-                  {verdict.note && <div className="why">{verdict.note}</div>}
                   <div className="expl">{(verdict.explanation ?? []).map((line, i) => <p key={i}>{line}</p>)}</div>
                   <div className="feat">
                     {Object.entries(verdict.inferred!.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
                   </div>
+                  {!!verdict.grants?.length && (
+                    <div className="grants">
+                      <span className="lbl">NSF awards</span>
+                      {verdict.grants.map((g, i) => <div key={i}><span>{g.title}</span><b>{g.start.slice(0, 4)}–{g.end.slice(0, 4)} · ${g.amount >= 1e6 ? (g.amount / 1e6).toFixed(1) + "M" : Math.round(g.amount / 1e3) + "k"}</b></div>)}
+                    </div>
+                  )}
                 </>
               )}
               <div className="why mono">Checked {verdict.checkedAt.slice(0, 10)}{verdict.openalexId && <> · OpenAlex {verdict.openalexId}</>}</div>
