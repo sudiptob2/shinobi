@@ -1,3 +1,4 @@
+# Checks only. Render watches main and deploys a commit once these checks pass (its auto-deploy is set to "after CI checks pass").
 name: CI
 
 on:
@@ -26,19 +27,3 @@ jobs:
       - run: npm run lint --prefix web
       - run: npm run build --prefix web
       - run: docker build -t shinobi .
-
-  # Deploys come from here, not from Render watching the branch, so nothing ships that failed the checks above.
-  deploy:
-    needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy on Render
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
-        run: |
-          if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then echo "Render secrets are not set, skipping"; exit 0; fi
-          curl -fsS -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
-            -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" \
-            -d "{\"commitId\": \"$GITHUB_SHA\"}" | sed 's/.*"id":"\([^"]*\)".*/deploy \1 started/'

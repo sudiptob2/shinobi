@@ -1,5 +1,5 @@
 # Render blueprint: one web service built from the Dockerfile.
-# Secrets are entered in the Render dashboard (sync: false). Deploys are triggered by CI through the Render API.
+# Secrets are entered in the Render dashboard (sync: false). Render deploys main once the CI checks pass.
 services:
   - type: web
     name: shinobi
@@ -8,7 +8,7 @@ services:
     region: virginia
     dockerfilePath: ./Dockerfile
     healthCheckPath: /app/me
-    autoDeploy: false
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_ENV
         value: production
