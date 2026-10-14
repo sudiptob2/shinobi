@@ -4,7 +4,12 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: &docs
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
   pull_request:
+    paths-ignore: *docs
 
 jobs:
   check:
