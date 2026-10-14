@@ -62,7 +62,7 @@ export function applyStaleness(r: Reading, year: number): Reading {
   return { ...r, status: "unstated", stale: `${r.status === "recruiting" ? "A recruiting" : "A not-recruiting"} note dated ${when} was found and ignored as out of date: "${r.quote}"` };
 }
 
-/** Ask an agent for one JSON object. Hosted Gemma endpoints return intermittent 500s; the SDK's own retries are not enough. */
+/** Ask an agent for one JSON object, at temperature 0 so a page reads the same way twice. Hosted Gemma endpoints return intermittent 500s; the SDK's own retries are not enough. */
 export async function generateJson<T>(agent: Agent, prompt: string, parse: (raw: unknown) => T, settings?: { temperature?: number }): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
@@ -81,7 +81,7 @@ export async function generateJson<T>(agent: Agent, prompt: string, parse: (raw:
 
 export async function readPages(name: string, pages: { url: string; text: string }[]): Promise<Reading> {
   const year = new Date().getFullYear();
-  return applyStaleness(await generateJson(reader, PROMPT(name, year, pages), (raw) => Reading.parse(raw)), year);
+  return applyStaleness(await generateJson(reader, PROMPT(name, year, pages), (raw) => Reading.parse(raw), { temperature: 0 }), year);
 }
 
 // Short forms students type that are too short to match an institution name on OpenAlex or NSF.
@@ -104,7 +104,7 @@ Examples:
 "Hamed Hassani" -> {"name": "Hamed Hassani", "affiliation": ""}
 "Isha DeCoito, PhD" -> {"name": "Isha DeCoito", "affiliation": ""}
 "Daniel Ansari at Western University psychology" -> {"name": "Daniel Ansari", "affiliation": "Western University"}
-Reply with exactly one JSON object: {"name": "...", "affiliation": "..."}`, (raw) => raw as { name?: string; affiliation?: string });
+Reply with exactly one JSON object: {"name": "...", "affiliation": "..."}`, (raw) => raw as { name?: string; affiliation?: string }, { temperature: 0 });
   const strip = (x?: string) => (x ?? "").replace(/\b(dr|prof|professor|phd|ph\.d|md|mr|ms|mrs)\b\.?,?/gi, "").replace(/\s+/g, " ").trim();
   const name = strip(p.name) || strip(query) || query.trim();
   const affiliation = strip(p.affiliation);
