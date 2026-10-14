@@ -1,8 +1,7 @@
 // Pull OpenAlex features for every labeled professor into the Atlas features collection.
 import { readdirSync } from "node:fs";
 import { readCsv } from "../src/mastra/csv.ts";
-import { parse } from "node:path";
-import { features } from "../src/mastra/db.ts";
+import { features, type FeatureRow } from "../src/mastra/db.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, isAlphabetical } from "../src/mastra/tools/openalex.ts";
 import { fetchGrants, grantFeatures } from "../src/mastra/tools/grants.ts";
 
@@ -10,7 +9,7 @@ const YEAR = new Date().getFullYear();
 
 const rows = readdirSync("data")
   .filter((f) => f.endsWith(".csv"))
-  .flatMap((f) => readCsv(`data/${f}`).map((r) => ({ ...r, source: parse(f).name })))
+  .flatMap((f) => readCsv(`data/${f}`))
   .filter((r) => r.openalex_id);
 
 let n = 0;
@@ -24,7 +23,7 @@ for (const r of rows) {
     features: computeFeatures(works, r.openalex_id, YEAR, firstYear, grantFeatures(grants)),
     grants: grants.filter((g) => g.amount >= 50000).slice(0, 5),
     alphabetical: isAlphabetical(works),
-    status: r.status || null,
+    status: (r.status || null) as FeatureRow["status"],
     works: works.length,
     pulledAt: new Date().toISOString(),
   };

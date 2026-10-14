@@ -14,7 +14,7 @@
     "features": "node --env-file=.env scripts/features.ts",
     "batch": "node --env-file=.env scripts/batch.ts",
     "typecheck": "tsc",
-    "test": "node --test src/**/*.test.ts"
+    "test": "node --test 'src/**/*.test.ts' 'web/src/*.test.ts'"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.95",

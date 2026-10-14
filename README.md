@@ -48,6 +48,9 @@ npm install
 npm run dev
 ```
 
+To deploy, build with `npm install && npm run build` and start with `npm start` on Node 22 or newer.
+Set every key from `.env.example` plus `NODE_ENV=production`, which marks the session cookie secure.
+
 ## Limitations
 
 Alphabetical author order carries no first-author signal, so those professors are not scored.

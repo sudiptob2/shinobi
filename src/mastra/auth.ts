@@ -39,7 +39,7 @@ export function sessionUserId(c: Context): string | null {
 export async function currentUser(c: Context) {
   const id = sessionUserId(c);
   if (!id) return null;
-  return users.findOne({ _id: new ObjectId(id) as any }, { projection: { passwordHash: 0 } });
+  return users.findOne({ _id: new ObjectId(id) }, { projection: { passwordHash: 0 } });
 }
 
 export async function signUp(email: string, password: string) {

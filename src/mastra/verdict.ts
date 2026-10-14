@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Grant } from "./tools/grants.ts";
 
 // The one output of the whole system. Every tier produces exactly this.
 export const Verdict = z.object({
@@ -14,7 +15,7 @@ export const Verdict = z.object({
       sourceUrl: z.string().url(),
     })
     .optional(),
-  // inferred: TabPFN probability over the seven OpenAlex features
+  // inferred: TabPFN probability over the publication and grant features
   inferred: z
     .object({
       probability: z.number().min(0).max(1),
@@ -22,7 +23,7 @@ export const Verdict = z.object({
     })
     .optional(),
   explanation: z.array(z.string()).optional(), // why the record scored this way, one sentence per driver
-  grants: z.array(z.object({ title: z.string(), start: z.string(), end: z.string(), amount: z.number(), awardee: z.string() })).optional(), // NSF awards of $50k or more, latest first
+  grants: z.array(Grant).optional(), // NSF awards of $50k or more, latest first
   // not_scored: the reason is the output
   reason: z.string().optional(),
   openalexId: z.string().optional(),

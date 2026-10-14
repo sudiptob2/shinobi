@@ -1,9 +1,12 @@
 // NSF awards: a recently started grant is money for a new student, and no faculty page ever states it.
 // NSF only. Canadian (NSERC) and NIH funding are not checked, and the explanation says so.
-export type Grant = { title: string; start: string; end: string; amount: number; awardee: string };
+import { z } from "zod";
+import { schoolWords, words } from "./text.ts";
+
+export const Grant = z.object({ title: z.string(), start: z.string(), end: z.string(), amount: z.number(), awardee: z.string() });
+export type Grant = z.infer<typeof Grant>;
 export type GrantFeatures = { active_grants: number; months_since_grant: number };
 
-const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
 const MIN_AMOUNT = 50_000; // below this it is a travel or workshop grant, not a lab budget
 
 export async function fetchGrants(name: string, affiliation?: string): Promise<Grant[]> {
@@ -14,11 +17,11 @@ export async function fetchGrants(name: string, affiliation?: string): Promise<G
   const r = await fetch(u, { signal: AbortSignal.timeout(15000) });
   if (!r.ok) return [];
   const d = (await r.json()) as { response?: { award?: any[] } };
-  const want = norm(name);
-  const hint = norm(affiliation ?? "").filter((w) => w.length > 3 && !["university", "college", "institute", "school"].includes(w));
+  const want = words(name);
+  const hint = schoolWords(affiliation);
   return (d.response?.award ?? [])
-    .filter((a) => { const have = norm(`${a.piFirstName} ${a.piLastName}`); return want[0] && have.includes(want[0]) && have.includes(want.at(-1)!); })
-    .filter((a) => !hint.length || hint.some((w) => norm(a.awardeeName ?? "").includes(w)))
+    .filter((a) => { const have = words(`${a.piFirstName} ${a.piLastName}`); return want[0] && have.includes(want[0]) && have.includes(want.at(-1)!); })
+    .filter((a) => !hint.length || hint.some((w) => words(a.awardeeName).includes(w)))
     .map((a) => ({ title: a.title, start: iso(a.startDate), end: iso(a.expDate), amount: Number(a.fundsObligatedAmt ?? 0), awardee: a.awardeeName ?? "" }))
     .sort((a, b) => (a.start < b.start ? 1 : -1));
 }

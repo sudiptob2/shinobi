@@ -20,15 +20,16 @@ function findRoot(dir = process.cwd()): string {
 const WEB = join(findRoot(), "web/dist");
 const MIME: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".woff2": "font/woff2" };
 
-// ponytail: in-memory per-user limit, resets on restart; move to Atlas if abuse shows up.
-const CHECKS_PER_HOUR = 20;
+// ponytail: in-memory sliding-window limits, reset on restart; move to Atlas if abuse shows up.
+const CHECKS_PER_HOUR = 20, CHECKS_PER_DAY_ALL = 80, SIGNINS_PER_HOUR = 10;
 const usage = new Map<string, number[]>();
-function allow(userId: string) {
-  const now = Date.now(), recent = (usage.get(userId) ?? []).filter((t) => now - t < 36e5);
-  if (recent.length >= CHECKS_PER_HOUR) return false;
-  usage.set(userId, [...recent, now]);
+function allow(key: string, limit: number, windowMs = 36e5) {
+  const now = Date.now(), recent = (usage.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= limit) return false;
+  usage.set(key, [...recent, now]);
   return true;
 }
+const ip = (c: { req: { header: (n: string) => string | undefined } }) => c.req.header("x-forwarded-for")?.split(",")[0].trim() || "local";
 
 const fail = (e: unknown) => ({ error: (e as Error).message });
 
@@ -51,6 +52,7 @@ export const mastra = new Mastra({
         catch (e) { return c.json(fail(e), 400); }
       } }),
       registerApiRoute("/app/signin", { method: "POST", handler: async (c) => {
+        if (!allow(`signin:${ip(c)}`, SIGNINS_PER_HOUR)) return c.json({ error: "Too many sign-in attempts. Try again in an hour" }, 429);
         try { const { email, password } = await c.req.json(); startSession(c, await signIn(email, password)); return c.json({ ok: true }); }
         catch (e) { return c.json(fail(e), 401); }
       } }),
@@ -68,11 +70,13 @@ export const mastra = new Mastra({
       registerApiRoute("/app/check", { method: "POST", handler: async (c) => {
         const userId = sessionUserId(c);
         if (!userId) return c.json({ error: "Sign in to check a professor" }, 401);
-        if (!allow(userId)) return c.json({ error: `You have used ${CHECKS_PER_HOUR} checks this hour. Try again later` }, 429);
         const { query } = (await c.req.json()) as { query?: string };
         const q = query?.trim() ?? "";
         if (!q) return c.json({ error: "Type a professor's name or paste a faculty page URL" }, 400);
-        const input = /^https?:\/\//i.test(q) ? { url: q } : { query: q };
+        if (!allow(userId, CHECKS_PER_HOUR)) return c.json({ error: `You have used ${CHECKS_PER_HOUR} checks this hour. Try again later` }, 429);
+        // the search quota is shared by everyone, so one global cap protects it from throwaway accounts
+        if (!allow("all", CHECKS_PER_DAY_ALL, 864e5)) return c.json({ error: "Shinobi has reached its daily limit of checks. Try again tomorrow" }, 429);
+        const input = { ...(/^https?:\/\//i.test(q) ? { url: q } : { query: q }), userId };
 
         const run = await check.createRun();
         const stream = await run.stream({ inputData: input });
@@ -85,15 +89,14 @@ export const mastra = new Mastra({
               for await (const chunk of stream.fullStream as AsyncIterable<any>) {
                 if (chunk.type === "workflow-step-start") send({ type: "start", step: chunk.payload.id });
                 else if (chunk.type === "workflow-step-result") {
+                  // a failed step stays "on" in the client until the finish event marks it failed
                   if (chunk.payload.status === "failed") stepError = chunk.payload.error?.message ?? String(chunk.payload.error ?? "");
-                  send({ type: "result", step: chunk.payload.id, output: chunk.payload.output });
+                  else send({ type: "result", step: chunk.payload.id, output: chunk.payload.output });
                 }
                 else if (chunk.type === "workflow-finish") {
                   const verdict = chunk.payload.finalWorkflowResult;
-                  if (chunk.payload.workflowStatus === "success" && verdict) {
-                    await checks.insertOne({ userId, query: q, name: verdict.name, verdict, createdAt: new Date().toISOString() });
-                    send({ type: "verdict", verdict });
-                  } else send({ type: "error", message: stepError || chunk.payload.error?.message || "The check did not finish" });
+                  if (chunk.payload.workflowStatus === "success" && verdict) send({ type: "verdict", verdict });
+                  else send({ type: "error", message: stepError || chunk.payload.error?.message || "The check did not finish" });
                 }
               }
             } catch (e) { send({ type: "error", message: (e as Error).message }); }

@@ -2,20 +2,21 @@
 import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
 import { Verdict } from "./verdict.ts";
-import { professors } from "./db.ts";
+import { checks } from "./db.ts";
 import { findFacultyPage } from "./tools/serpapi.ts";
 import { readSite } from "./tools/page.ts";
 import { parseQuery, readPages, Reading } from "./tools/gemma.ts";
 import { computeFeatures, fetchFirstYear, fetchWorks, findAuthor, isAlphabetical } from "./tools/openalex.ts";
 import { predict } from "./tools/tabpfn.ts";
 import { explain, reference } from "./tools/explain.ts";
-import { fetchGrants, grantFeatures, grantLine } from "./tools/grants.ts";
+import { fetchGrants, Grant, grantFeatures, grantLine } from "./tools/grants.ts";
 
 const Input = z.object({
   query: z.string().optional(), // free text, parsed by the model
   name: z.string().optional(),
   url: z.string().url().optional(),
   affiliation: z.string().optional(),
+  userId: z.string().optional(), // when set, the verdict is saved to this user's checks
 });
 
 /** Prefer the page's own form of the name ("Pamela Bishop" over "Pam Bishop") when it is clearly the same person. */
@@ -88,9 +89,7 @@ const read = createStep({
   },
 });
 
-const WithGrants = Read.extend({
-  grants: z.array(z.object({ title: z.string(), start: z.string(), end: z.string(), amount: z.number(), awardee: z.string() })),
-});
+const WithGrants = Read.extend({ grants: z.array(Grant) });
 
 // NSF awards under this name at this institution. A step of its own so the trace shows it.
 const grants = createStep({
@@ -132,12 +131,14 @@ const infer = createStep({
   },
 });
 
+// The verdict goes into the user's history. A batch run has no user and saves nothing.
 const save = createStep({
   id: "save",
   inputSchema: Verdict,
   outputSchema: Verdict,
-  execute: async ({ inputData: verdict }) => {
-    await professors.replaceOne({ name: verdict.name }, verdict, { upsert: true });
+  execute: async ({ inputData: verdict, getInitData }) => {
+    const init = getInitData<z.infer<typeof Input>>();
+    if (init.userId) await checks.insertOne({ userId: init.userId, query: init.query ?? init.url ?? init.name ?? "", name: verdict.name, verdict, createdAt: verdict.checkedAt });
     return verdict;
   },
 });

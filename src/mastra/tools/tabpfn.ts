@@ -1,6 +1,6 @@
 // TabPFN via the Prior Labs REST API: fit once on the labeled table, predict per professor.
 import { createHash } from "node:crypto";
-import { features, models, professors } from "../db.ts";
+import { features, models } from "../db.ts";
 import type { Features } from "./openalex.ts";
 
 const API = "https://api.priorlabs.ai/tabpfn";
@@ -13,6 +13,7 @@ async function call<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   const text = await r.text();
+  // 409 is "already uploaded", which is fine for a re-run
   if (!r.ok && r.status !== 409) throw new Error(`TabPFN ${path} ${r.status}: ${text.slice(0, 300)}`);
   return JSON.parse(text.trim()) as T;
 }

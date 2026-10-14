@@ -2,7 +2,7 @@ import type { Verdict } from "../../src/mastra/verdict";
 export type { Verdict };
 
 export type User = { email: string };
-export type HistoryItem = { query: string; name: string; verdict: Verdict; createdAt: string };
+export type HistoryItem = { name: string; verdict: Verdict; createdAt: string };
 export type StepEvent =
   | { type: "start"; step: string }
   | { type: "result"; step: string; output: any }

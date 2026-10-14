@@ -1,54 +1,11 @@
 import { useState, type FormEvent } from "react";
 import type { Verdict } from "./api";
 import { Logo } from "./Logo";
+import { FEATURE_NAMES, type Filter, fmt, label, recordLine, recordTone, tone, verdictOf } from "./verdict";
 
-/* ---------- small helpers ---------- */
-
-export type Tone = "g" | "y" | "r" | "n";
-const band = (p: number) => (p >= 0.6 ? "high" : p >= 0.4 ? "mid" : "low");
-
-/** One verdict from both signals: what the page says and what the publications say. */
-export function verdictOf(v: Verdict): { label: string; tone: Tone; filter: Filter } {
-  const p = v.inferred?.probability;
-  if (v.stated?.status === "not_recruiting") return { label: "Not taking", tone: "r", filter: "r" };
-  if (v.stated?.status === "recruiting") {
-    if (p == null) return { label: "Says taking, unverified", tone: "g", filter: "g" };
-    const b = band(p);
-    return b === "high" ? { label: "Taking students", tone: "g", filter: "g" } : b === "mid" ? { label: "Says taking, slower intake", tone: "y", filter: "g" } : { label: "Says taking, rarely does", tone: "y", filter: "g" };
-  }
-  if (p == null) return { label: "Not scored", tone: "n", filter: "n" };
-  const b = band(p);
-  return b === "high" ? { label: "Likely taking", tone: "g", filter: "y" } : b === "mid" ? { label: "Toss-up", tone: "y", filter: "y" } : { label: "Unlikely", tone: "r", filter: "y" };
-}
-export const tone = (v: Verdict): Tone => verdictOf(v).tone;
-export const label = (v: Verdict): string => verdictOf(v).label;
-export function short(v: Verdict): string {
-  if (v.stated) return v.stated.status === "recruiting" ? "yes" : "no";
-  return v.inferred ? v.inferred.probability.toFixed(2) : "n/a";
-}
-export const recordTone = (p: number): Tone => (p >= 0.6 ? "g" : p >= 0.4 ? "y" : "r");
-export function recordLine(v: Verdict): string {
-  const p = v.inferred!.probability;
-  if (!v.stated) return "of labs with this publication pattern said they were taking students";
-  if (v.stated.status === "recruiting") return p >= 0.6 ? "of labs that publish like this said yes too. The publications back the page." : p >= 0.4 ? "of labs that publish like this said yes. The page says yes, the publications are unsure." : "of labs that publish like this said yes. The page says yes, but few labs that publish like this were taking students.";
-  return p >= 0.6 ? "of labs that publish like this said yes. The page says no, so trust the page." : "of labs that publish like this said yes. The publications agree with the page.";
-}
 const host = (u?: string) => (u ? u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") : "");
 const pct = (p: number) => `${Math.round(p * 100)}%`;
-
-export const FEATURE_NAMES: Record<string, string> = {
-  new_first_authors_rate: "New first authors per year",
-  new_first_authors_trend: "Change vs the three years before",
-  junior_cohort: "Junior coauthors active now",
-  outflow: "Juniors who finished recently",
-  pub_rate: "Papers per year",
-  pub_rate_trend: "Change in papers per year",
-  career_years: "Years since first paper",
-  years_since_last: "Years since last paper",
-  active_grants: "Active NSF awards",
-  months_since_grant: "Months since the latest NSF award",
-};
-const fmt = (k: string, n: number) => (k.includes("trend") ? (n >= 0 ? "+" : "") + n.toFixed(1) : Number.isInteger(n) ? String(n) : n.toFixed(1));
+const YEAR = new Date().getFullYear();
 
 /* ---------- sign in: brand panel left, form right ---------- */
 
@@ -89,7 +46,7 @@ export function SignIn({ onSubmit }: { onSubmit: (mode: "signin" | "signup", ema
             ))}
           </ul>
         </div>
-        <p className="auth-foot">© {new Date().getFullYear()} Shinobi · open source</p>
+        <p className="auth-foot">© {YEAR} Shinobi · open source</p>
       </aside>
 
       <section className="auth-form">
@@ -172,7 +129,7 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
                 <>
                   <div className="expl">{(verdict.explanation ?? []).map((line, i) => <p key={i}>{line}</p>)}</div>
                   <div className="feat">
-                    {Object.entries(verdict.inferred!.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
+                    {Object.entries(verdict.inferred.features).map(([k, n]) => <div key={k}><span>{FEATURE_NAMES[k] ?? k}</span><b>{fmt(k, n)}</b></div>)}
                   </div>
                   {!!verdict.grants?.length && (
                     <div className="grants">
@@ -193,15 +150,11 @@ export function Result({ steps, running, verdict, error, total }: { steps: Step[
 
 /* ---------- table ---------- */
 
-export type Filter = "all" | "g" | "y" | "r" | "n"; // g: page says taking, y: inferred only, r: not taking, n: not scored
-
 const PAGE = 10;
 
-export function Table({ title, note, empty, rows, filter, onFilter, onPick, sorted, limit, onMore }: { title: string; note?: string; empty: string; rows: Verdict[]; filter: Filter; onFilter: (f: Filter) => void; onPick: (v: Verdict) => void; sorted?: boolean; limit?: number; onMore?: () => void }) {
+export function Table({ title, note, empty, rows, filter, onFilter, onPick, limit, onMore }: { title: string; note?: string; empty: string; rows: Verdict[]; filter: Filter; onFilter: (f: Filter) => void; onPick: (v: Verdict) => void; limit?: number; onMore?: () => void }) {
   const [page, setPage] = useState(0);
-  const order = (v: Verdict) => { const f = verdictOf(v).filter; const p = v.inferred?.probability ?? 0; return f === "g" ? 1 - p : f === "y" ? 2 - p : f === "r" ? 3 : 4; };
   const all = rows.filter((v) => filter === "all" || verdictOf(v).filter === filter);
-  if (sorted) all.sort((a, b) => order(a) - order(b));
   const pages = limit ? 1 : Math.max(1, Math.ceil(all.length / PAGE));
   const at = Math.min(page, pages - 1);
   const shown = limit ? all.slice(0, limit) : all.slice(at * PAGE, at * PAGE + PAGE);

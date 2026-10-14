@@ -5,8 +5,9 @@ const { applyStaleness } = await import("./gemma.ts");
 
 const r = (quote: string, date = "") => ({ status: "recruiting" as const, quote, page: 1, confidence: 1, date });
 test("stale notes become unstated with a note", () => {
-  assert.equal(applyStaleness(r("WING lab is currently recruiting", "Jan 1, 2021"), 2026).status, "unstated");
-  assert.match(applyStaleness(r("WING lab is currently recruiting", "Jan 1, 2021"), 2026).stale!, /dated Jan 1, 2021/);
+  const old = applyStaleness(r("WING lab is currently recruiting", "Jan 1, 2021"), 2026);
+  assert.equal(old.status, "unstated");
+  assert.match(old.stale!, /dated Jan 1, 2021/);
   assert.equal(applyStaleness(r("I am looking for PhD students for Fall 2026 start"), 2026).status, "unstated");
   assert.equal(applyStaleness(r("[January 2024] I'm always looking for students"), 2026).status, "unstated");
 });

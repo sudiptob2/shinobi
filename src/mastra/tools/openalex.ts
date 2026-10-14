@@ -1,5 +1,6 @@
-// OpenAlex: fetch an author's works and turn them into the seven features
+// OpenAlex: fetch an author's works and turn them into the publication features
 // the predictor sees, plus the alphabetical-order flag that disables it.
+import { schoolWords, words } from "./text.ts";
 
 export type Work = {
   publication_year: number;
@@ -41,12 +42,11 @@ export async function findAuthor(name: string, affiliation?: string): Promise<Au
   u.searchParams.set("per_page", "10");
   u.searchParams.set("select", "id,display_name,affiliations,works_count");
   const { results } = await get<{ results: any[] }>(u);
-  const norm = (n: string) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w.length > 1);
-  const want = norm(name);
-  const named = results.filter((a) => { const have = norm(a.display_name); return want.every((w) => have.includes(w)); }).filter((a) => a.works_count >= 5);
+  const want = words(name);
+  const named = results.filter((a) => { const have = words(a.display_name); return want.every((w) => have.includes(w)); }).filter((a) => a.works_count >= 5);
   if (!named.length) return { reason: `OpenAlex has no author named ${name} with at least five papers, so there is no publication history to score.` };
 
-  const hint = (affiliation ?? "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3 && !["university", "department", "school", "college", "institute", "professor"].includes(w));
+  const hint = schoolWords(affiliation);
   if (hint.length) {
     const at = named.filter((a) => (a.affiliations ?? []).some((x: any) => hint.some((w) => x.institution.display_name.toLowerCase().includes(w))));
     if (!at.length) return { reason: `OpenAlex has ${named.length === 1 ? "an author" : "authors"} named ${name}, but none at ${affiliation}. The name may be spelled differently there, so this was not scored.` };
@@ -127,7 +127,7 @@ export function computeFeatures(works: Work[], authorId: string, year: number, c
   // a junior is a first author whose first paper with me is within the last 6 years
   const juniors = [...firstYear].filter(([, fy]) => fy >= year - 6).map(([id]) => id);
   const junior_cohort = juniors.filter((id) => lastYear.get(id)! >= year - 2).length;
-  const outflow = juniors.filter((id) => { const ly = lastYear.get(id)!; return ly >= year - 2 && ly <= year - 1 && ly < year; }).length;
+  const outflow = juniors.filter((id) => { const ly = lastYear.get(id)!; return ly >= year - 2 && ly <= year - 1; }).length;
 
   return {
     new_first_authors_rate: mean(newFirstByYear, year - 2, year),

@@ -13,6 +13,7 @@ export function htmlToText(html: string): string {
     .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<!--[\s\S]*?-->/gi, " ")
     .replace(/<\/(p|div|li|h[1-6]|tr|br|section|article)>|<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&rsquo;|&lsquo;/g, "'")
     .replace(/[ \t]+/g, " ").replace(/\s*\n\s*/g, "\n").trim();
 }
@@ -32,15 +33,13 @@ export function focus(text: string, max = MAX_CHARS): string {
   return out;
 }
 
-/** The university named in a page title, if any ("Anwar Haque | Western University" -> "Western University"). */
-export function schoolFromTitle(html: string): string | undefined {
-  const t = htmlToText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
-  return t.split(/[|–\-:]/).map((x) => x.trim()).find((x) => /universit|college|institute|school/i.test(x));
-}
+/** "Anne-Marie Smith | Western University - Computer Science" -> its parts. Only spaced dashes split, so hyphenated names survive. */
+export const splitTitle = (t: string) => t.split(/\s*[|:]\s*|\s[–—-]\s/).map((x) => x.trim()).filter(Boolean);
+const titleParts = (html: string) => splitTitle(htmlToText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? ""));
 
-export function title(html: string): string {
-  return htmlToText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").split(/[|–-]/)[0].trim();
-}
+/** The university named in a page title, if any ("Anwar Haque | Western University" -> "Western University"). */
+export const schoolFromTitle = (html: string) => titleParts(html).find((x) => /universit|college|institute|school/i.test(x));
+export const title = (html: string) => titleParts(html)[0] ?? "";
 
 async function fetchHtml(url: string): Promise<string> {
   const r = await fetch(url, { headers: { "user-agent": UA, accept: "text/html" }, redirect: "follow", signal: AbortSignal.timeout(15000) });

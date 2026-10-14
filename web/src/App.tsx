@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, type HistoryItem, type StepEvent, type User, type Verdict } from "./api";
-import { Result, SignIn, Table, type Filter, type Step } from "./views";
+import { Result, SignIn, Table, type Step } from "./views";
+import type { Filter } from "./verdict";
 import { Logo } from "./Logo";
 
 const STEPS = ["parse", "locate", "read", "grants", "infer", "save"];
@@ -35,16 +36,26 @@ export default function App() {
   const [error, setError] = useState("");
   const t0 = useRef(0), tStep = useRef(0);
 
+  const clear = () => { setVerdict(null); setSteps(fresh()); setRunId(""); setError(""); setTotal(0); };
+
+  // open a saved verdict as the card, with every step shown as done
+  const show = (v: Verdict) => {
+    clear();
+    setView("search");
+    setVerdict(v);
+    setSteps(STEPS.map((id) => ({ id, state: "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "grants" ? (v.grants?.length ? `${v.grants.length} NSF award${v.grants.length > 1 ? "s" : ""}` : "No NSF award found") : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.inferred ? `TabPFN: ${v.inferred.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
+  };
+  // the search page opens on the latest check when there is one
+  const home = () => { if (history[0]) show(history[0].verdict); else { clear(); setView("search"); } };
+
   useEffect(() => { api.me().then(setUser).catch(() => setUser(null)); }, []);
-  useEffect(() => { if (user) api.history().then(setHistory).catch(() => {}); else setHistory([]); }, [user]);
-  useEffect(() => { if (history.length && !verdict && !running && view === "search") show(history[0].verdict); }, [history, view]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (user) api.history().then((h) => { setHistory(h); if (h[0]) show(h[0].verdict); }).catch(() => {}); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const auth = async (mode: "signin" | "signup", email: string, password: string) => {
     await (mode === "signin" ? api.signIn(email, password) : api.signUp(email, password));
     setUser(await api.me());
   };
-  const clear = () => { setVerdict(null); setSteps(fresh()); setRunId(""); setError(""); setTotal(0); };
-  const signOut = async () => { await api.signOut(); setUser(null); clear(); };
+  const signOut = async () => { await api.signOut(); setUser(null); setHistory([]); clear(); };
 
   const patch = (id: string, p: Partial<Step>) => setSteps((s) => s.map((x) => (x.id === id ? { ...x, ...p } : x)));
 
@@ -67,7 +78,7 @@ export default function App() {
       } else if (e.step === "save") patch("save", { state: "done", ms, detail: "Saved to your checks" });
     } else if (e.type === "verdict") {
       setVerdict(e.verdict);
-      setHistory((h) => [{ query, name: e.verdict.name, verdict: e.verdict, createdAt: e.verdict.checkedAt }, ...h]);
+      setHistory((h) => [{ name: e.verdict.name, verdict: e.verdict, createdAt: e.verdict.checkedAt }, ...h]);
     } else if (e.type === "error") {
       setError(e.message);
       setSteps((s) => s.map((x) => (x.state === "on" ? { ...x, state: "fail", detail: e.message } : x)));
@@ -88,14 +99,6 @@ export default function App() {
   };
   const run = (ev: FormEvent) => { ev.preventDefault(); runQuery(query); };
 
-  const show = (v: Verdict) => {
-    clear();
-    setView("search");
-    setVerdict(v);
-    setSteps(STEPS.map((id) => ({ id, state: "done", detail: id === "parse" ? `${v.name}${v.affiliation ? ` at ${v.affiliation}` : ""}` : id === "locate" ? "Page:" : id === "grants" ? (v.grants?.length ? `${v.grants.length} NSF award${v.grants.length > 1 ? "s" : ""}` : "No NSF award found") : id === "read" ? (v.tier === "stated" ? "The professor said it" : v.note ?? "Nothing stated") : id === "infer" ? (v.inferred ? `TabPFN: ${v.inferred.probability.toFixed(2)}` : v.reason ?? "") : "Saved", link: id === "locate" ? v.pageUrl : undefined })));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   if (user === undefined) return null;
   if (!user) return <SignIn onSubmit={auth} />;
 
@@ -105,9 +108,9 @@ export default function App() {
   return (
     <div className={`page ${view}`}>
       <header className="top">
-        <button className="brand" onClick={() => { clear(); setView("search"); }} aria-label="Home"><Logo size={24} /></button>
+        <button className="brand" onClick={home} aria-label="Home"><Logo size={24} /></button>
         <nav>
-          {view !== "search" && <button className="icon" onClick={() => { clear(); setView("search"); }} title="Check a professor" aria-label="Check a professor">
+          {view !== "search" && <button className="icon" onClick={home} title="Check a professor" aria-label="Check a professor">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           </button>}
           <button className={`icon ${view === "history" ? "on" : ""}`} onClick={() => setView("history")} title="Your checks" aria-label="Your checks">

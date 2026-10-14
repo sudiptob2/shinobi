@@ -62,15 +62,14 @@ export function applyStaleness(r: Reading, year: number): Reading {
   return { ...r, status: "unstated", stale: `${r.status === "recruiting" ? "A recruiting" : "A not-recruiting"} note dated ${when} was found and ignored as out of date: "${r.quote}"` };
 }
 
-export async function readPages(name: string, pages: { url: string; text: string }[]): Promise<Reading> {
-  const prompt = PROMPT(name, new Date().getFullYear(), pages);
-  // Google AI Studio returns intermittent 500s on Gemma; the SDK's own retries are not enough.
+/** Ask the reader for one JSON object. Google AI Studio returns intermittent 500s on Gemma; the SDK's own retries are not enough. */
+async function generateJson<T>(prompt: string, parse: (raw: unknown) => T): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       const res = await reader.generate(prompt);
       const json = res.text.match(/\{[\s\S]*\}/)?.[0];
-      if (!json) throw new Error(`Gemma returned no JSON: ${res.text.slice(0, 200)}`);
-      return applyStaleness(Reading.parse(JSON.parse(json)), new Date().getFullYear());
+      if (!json) throw new Error(`The reader returned no JSON: ${res.text.slice(0, 200)}`);
+      return parse(JSON.parse(json));
     } catch (e) {
       if (attempt >= 4) throw e;
       // quota errors say how long to wait; everything else gets a short backoff
@@ -80,9 +79,23 @@ export async function readPages(name: string, pages: { url: string; text: string
   }
 }
 
+export async function readPages(name: string, pages: { url: string; text: string }[]): Promise<Reading> {
+  const year = new Date().getFullYear();
+  return applyStaleness(await generateJson(PROMPT(name, year, pages), (raw) => Reading.parse(raw)), year);
+}
+
+// Short forms students type that are too short to match an institution name on OpenAlex or NSF.
+const ALIASES: Record<string, string> = {
+  mit: "Massachusetts Institute of Technology", cmu: "Carnegie Mellon University", uw: "University of Washington", uwo: "Western University",
+  ubc: "University of British Columbia", uoft: "University of Toronto", "u of t": "University of Toronto", nyu: "New York University",
+  ucla: "University of California, Los Angeles", ucsd: "University of California, San Diego", ucb: "UC Berkeley", usc: "University of Southern California",
+  uiuc: "University of Illinois Urbana-Champaign", umich: "University of Michigan", gatech: "Georgia Institute of Technology", sfu: "Simon Fraser University",
+  utd: "University of Texas at Dallas", ut: "University of Texas", psu: "Pennsylvania State University", jhu: "Johns Hopkins University", wustl: "Washington University in St. Louis",
+};
+
 /** Split free text like "Pam Bishop Western" into the person and the institution. */
 export async function parseQuery(query: string): Promise<{ name: string; affiliation?: string }> {
-  const res = await reader.generate(`A student typed this into a box that asks for a professor's name and university:
+  const p = await generateJson(`A student typed this into a box that asks for a professor's name and university:
 "${query}"
 Split it into the person and the institution. A person's name is two or three words; anything else is the institution, including short forms and nicknames of universities (Western, Brock, Penn, MIT, CMU, UWO, UofT, Mila). Keep the student's spelling. Do not add a university that was not typed. Titles and degrees (Dr., Prof., PhD, MD, Professor) are not an institution and not part of the name.
 Examples:
@@ -91,11 +104,9 @@ Examples:
 "Hamed Hassani" -> {"name": "Hamed Hassani", "affiliation": ""}
 "Isha DeCoito, PhD" -> {"name": "Isha DeCoito", "affiliation": ""}
 "Daniel Ansari at Western University psychology" -> {"name": "Daniel Ansari", "affiliation": "Western University"}
-Reply with exactly one JSON object: {"name": "...", "affiliation": "..."}`);
-  const json = res.text.match(/\{[\s\S]*\}/)?.[0];
-  const p = json ? (JSON.parse(json) as { name?: string; affiliation?: string }) : {};
+Reply with exactly one JSON object: {"name": "...", "affiliation": "..."}`, (raw) => raw as { name?: string; affiliation?: string });
   const strip = (x?: string) => (x ?? "").replace(/\b(dr|prof|professor|phd|ph\.d|md|mr|ms|mrs)\b\.?,?/gi, "").replace(/\s+/g, " ").trim();
   const name = strip(p.name) || strip(query) || query.trim();
   const affiliation = strip(p.affiliation);
-  return { name, affiliation: affiliation || undefined };
+  return { name, affiliation: ALIASES[affiliation.toLowerCase()] ?? (affiliation || undefined) };
 }
