@@ -2,6 +2,8 @@
   "name": "shinobi",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
+  "repository": "github:sudiptob2/shinobi",
   "description": "Is this professor taking PhD students? Reads their page, their grants and their publications and gives a verdict.",
   "type": "module",
   "engines": {

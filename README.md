@@ -1,11 +1,19 @@
 # Shinobi
 
+[![CI](https://github.com/sudiptob2/shinobi/actions/workflows/ci.yml/badge.svg)](https://github.com/sudiptob2/shinobi/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Node 22](https://img.shields.io/badge/node-%3E%3D22-339933?logo=node.js&logoColor=white)](package.json)
+[![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)](compose.yaml)
+[![Deploy to Render](https://img.shields.io/badge/deploy-Render-46E3B7?logo=render&logoColor=black)](https://render.com/deploy?repo=https://github.com/sudiptob2/shinobi)
+
 Is this professor taking PhD students?
 Live at https://askshinobi.tech
 
 Type a professor's name and university, or paste a faculty page URL.
 Shinobi finds the page, reads it, quotes any recruiting statement the professor made, looks up their NSF awards, pulls their publication record from OpenAlex, and scores how likely the lab is to be taking students.
 The verdict shows both signals side by side, because a page that says "taking students" is not always current.
+
+![Shinobi: a verdict card for a professor, with the quoted statement, the publication score and the six workflow steps](docs/screenshot.png)
 
 ## How a verdict is produced
 
@@ -118,6 +126,11 @@ A statement dated before 2025 counts as unstated.
 | Not recruiting | 4 |
 | Unstated | 25 |
 
+## Contributing
+
+Pull requests are welcome, and a carefully labeled professor is the most valuable one.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the setup, the checks to run, the commit style and how to add a label.
+
 ## Limitations
 
 Alphabetical author order carries no first-author signal, so those professors are not scored.
@@ -129,4 +142,6 @@ Nothing is ever emailed on your behalf.
 
 ## License
 
-MIT.
+Apache License 2.0. See [LICENSE](LICENSE).
+
+Built for the DEV.to Hacktoberfest Open-Source AI Challenge 2026.
