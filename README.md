@@ -5,17 +5,15 @@
 [![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)](compose.yaml)
 [![Deploy to Render](https://img.shields.io/badge/deploy-Render-46E3B7?logo=render&logoColor=black)](https://render.com/deploy?repo=https://github.com/sudiptob2/shinobi)
 
-**Shinobi tells you whether a professor is taking PhD students, before you email them.**
-Type a name and a university.
-About thirty seconds later you get the professor's own words if they said anything, a score based on their publication record either way, and the reasons behind both.
+**Shinobi tells you whether a professor is really taking PhD students, before you email them.** Type a name and a university. About thirty seconds later you get the professor's own words if they said anything, a score based on their publication record either way, and the reasons behind both.
 
-Live at https://askshinobi.tech
+Live at [https://askshinobi.tech](https://askshinobi.tech)
 
 ![Shinobi verdict card](docs/screenshot.png)
 
 ## Why
 
-When I was applying for a PhD, I made a list of professors whose work I liked and emailed them one by one.
+When I was applying for a Master's, I made a list of professors whose work I liked and emailed them one by one.
 **Most of them never replied.**
 At first I thought my emails were the problem.
 Then I looked closer at the list and saw that many of those professors were simply **not taking new students that year**.
@@ -41,10 +39,10 @@ The other four are ordinary code.
 1. **parse** (agent): turns what you typed into a person and a university.
 2. **locate**: searches with SerpApi for the faculty or lab page, preferring university sites and skipping aggregator sites.
 3. **read** (agent): fetches the page and its lab pages, then the reader answers four questions: is there a recruiting statement, *what exactly does it say*, which page is it on, and when was it written.
-   A statement about a past admissions cycle is marked as *stale* and ignored.
+  A statement about a past admissions cycle is marked as *stale* and ignored.
 4. **grants**: counts the professor's active NSF awards and checks how recent the latest one is.
 5. **infer**: turns the publication record from OpenAlex into ten numbers, asks TabPFN for a probability, and writes an explanation from those same numbers, so *the words can never disagree with the score*.
-   It **refuses to guess** when the field lists authors alphabetically, when the record is too thin, or when the name is ambiguous.
+  It **refuses to guess** when the field lists authors alphabetically, when the record is too thin, or when the name is ambiguous.
 6. **save**: stores the verdict in your history.
 
 The two signals, **what the page says** and **what the record says**, are combined into one label: *Taking students*, *Says taking but slower intake*, *Says taking but rarely does*, *Not taking*, *Likely*, *Toss-up*, *Unlikely*, or *Not scored* with the reason.
