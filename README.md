@@ -54,8 +54,7 @@ The first start fills the labeled table TabPFN learns from, which takes a couple
 For development, `docker compose up mongo seed` then `npm run dev`.
 Checks: `npm test`, `npm run typecheck`, `npm run lint --prefix web`, and `npm run batch` to score the reader against the hand labels.
 
-Contributions are welcome, and a careful new label is the most useful one.
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
