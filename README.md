@@ -6,35 +6,142 @@
 [![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)](compose.yaml)
 [![Deploy to Render](https://img.shields.io/badge/deploy-Render-46E3B7?logo=render&logoColor=black)](https://render.com/deploy?repo=https://github.com/sudiptob2/shinobi)
 
-Is this professor taking PhD students?
-Live at https://askshinobi.tech
+**An agent that checks whether a professor is taking PhD students, before you email them.**
+Type a name and a university, or paste a faculty page.
+Thirty seconds later you have the professor's own words if they said anything, a score from their publication record either way, and a plain-language reason for both.
 
-Type a professor's name and university, or paste a faculty page URL.
-Shinobi finds the page, reads it, quotes any recruiting statement the professor made, looks up their NSF awards, pulls their publication record from OpenAlex, and scores how likely the lab is to be taking students.
-The verdict shows both signals side by side, because a page that says "taking students" is not always current.
+Live at https://askshinobi.tech
 
 ![Shinobi: a verdict card for a professor, with the quoted statement, the publication score and the six workflow steps](docs/screenshot.png)
 
-## How a verdict is produced
+## The problem
 
-The check is a six-step Mastra workflow, and every step shows in the UI.
+Applying to a PhD means emailing professors.
+Most applicants send twenty or more messages and hear back from two or three.
+The usual advice is to write better emails, but the bigger reason is upstream: a large share of any shortlist is professors who are not taking students this cycle.
+Their page does not say so, or it says "I am always looking for students" and was last touched in 2021, or it says "recruiting" and means one student who was already chosen.
+The applicant has no way to tell, so they email everyone, and the professors who are actually recruiting are buried under the same pile.
 
-1. **parse**: the reader model splits what was typed into a person and an institution.
-2. **locate**: SerpApi finds the faculty or lab page.
-3. **read**: the page and its lab, news and prospective-student subpages are read by the reader model, which returns any recruiting status with the sentence that states it.
-   A statement for a past cycle, or dated more than a year ago, is reported as out of date and ignored.
-4. **grants**: the NSF awards API is queried for the professor's name at that institution.
-5. **infer**: OpenAlex works become ten features (new first authors per year, junior cohort, outflow, publication rate and trend, career length, dormancy, active grants, months since the last grant).
-   TabPFN, fit on the hand-labeled shortlist, returns the probability that a lab with this record is taking students, and a deterministic explanation compares each feature with the labeled medians.
-6. **save**: the verdict goes into the user's history.
+I labeled 59 machine learning professors at US and Canadian universities by hand to see how bad this is.
+Reading every faculty page and every lab page took a day.
 
-Every professor gets both signals.
-The combined label is one of: Taking students, Says taking but slower intake, Says taking but rarely does, Says taking but unverified, Not taking, Likely taking, Toss-up, Unlikely, Not scored.
-Professors whose fields list authors alphabetically, who cannot be matched on OpenAlex, or who have under five papers get a reason instead of a score.
+| What the pages said | Professors |
+|---|---|
+| Taking students, in so many words | 30 |
+| Not taking students | 4 |
+| Nothing at all | 25 |
+
+Almost half said nothing.
+Of the 30 who said yes, several had a note that was years old, and several more had a publication record that did not look like a group with open seats.
+That is the gap Shinobi is built for: it does the day of reading in thirty seconds, and it does not stop at what the page says.
+
+## What Shinobi does
+
+For one professor, the agent:
+
+1. finds the right page from a name and a school, skipping aggregator sites and namesakes;
+2. reads the page and the lab pages behind it, and reports whether the professor states a recruiting status, quoting the exact sentence and the page it came from;
+3. throws the statement out if it is for a past admissions cycle or dated more than a year ago, and says so;
+4. looks up the professor's NSF awards, because a grant that started this year funds a student next year and no page ever mentions it;
+5. pulls the professor's publication record and turns it into ten features about how many new students the group takes and how many finish;
+6. scores that record with TabPFN, a tabular foundation model fit on the hand-labeled professors, and explains the score sentence by sentence against the labeled groups;
+7. combines both signals into one label, and refuses to score when the data would mislead.
+
+Every step shows in the interface as it runs, with what it found.
+
+The labels a student sees:
+
+| Label | Meaning |
+|---|---|
+| Taking students | the page says yes and the record agrees |
+| Says taking, slower intake | the page says yes, the record looks like a group that takes fewer students than it says |
+| Says taking, rarely does | the page says yes, the record looks like a group that has not taken students in a while |
+| Says taking, unverified | the page says yes and the record could not be scored |
+| Not taking | the page says no, which overrides everything |
+| Likely taking, Toss-up, Unlikely | the page says nothing; the record alone, at over 60%, 40 to 60%, or under 40% |
+| Not scored | the page says nothing and the record cannot be trusted; the reason is shown |
+
+The second row is the case this project exists for.
+A page that says "taking students" is not always current, and a student deserves to know when the numbers disagree with the words.
+
+## How the agent works
+
+![Architecture: a student asks the web app, the Mastra server runs a six-step workflow that calls Gemma, SerpApi, the NSF API, OpenAlex and TabPFN, and the two signals meet in one verdict](docs/architecture.png)
+
+The check is a [Mastra](https://mastra.ai) workflow with six steps.
+The plan is fixed, which is deliberate: a student should get the same kind of answer every time, and a fixed plan is what makes the trace in the interface meaningful.
+The judgment lives inside the steps, in the model that reads the pages, in the rules about which links to follow, and in the refusals.
+
+### The components
+
+**Query parser** (`tools/gemma.ts`, step 1).
+Gemma turns whatever was typed into a person and an institution: "prof. anwar haque uwo" becomes Anwar Haque at UWO, and a short form like UWO, MIT or CMU is expanded to the full name so the later lookups can match it.
+Titles and degrees are stripped.
+
+**Locator** (`tools/serpapi.ts`, step 2).
+Two search queries through SerpApi, the quoted name with the school and then the name with "professor".
+Results must contain every token of the name.
+Academic hosts and titles that read as a faculty page score highest; LinkedIn, ResearchGate, people-search sites and publisher pages are never followed.
+If only a Google Scholar profile surfaces, the agent reads it and takes the homepage it lists, provided the name and school agree.
+
+**Page reader** (`tools/page.ts`, step 3).
+Fetches the page, converts it to text, and keeps the passages around student-related keywords so a long page still fits.
+It then follows up to five links that look like they could carry a recruiting note: "prospective students", "join the lab", "openings", and off-site links only when they look like the professor's own lab and the target page mentions their name.
+A lab site on another host gets one more hop for its join or contact page.
+
+**Reader model** (`tools/gemma.ts`, step 3).
+Gemma, through any OpenAI-compatible host, reads the collected pages and returns one JSON object: a status, the decisive sentence copied verbatim, which page it came from, and any date printed next to it.
+The prompt is strict about what does not count: headings, menu items, invitations to apply, conditionals, anything about postdocs or master's students, and anything naming a past cycle.
+Staleness is then decided in code, not by the model: a statement for a cycle that already started, or dated more than a year ago, becomes "unstated" with a note that says what was found and why it was ignored.
+
+**Grants** (`tools/grants.ts`, step 4).
+The NSF awards API, keyless, queried by principal investigator name and filtered to the professor's institution.
+Awards under $50,000 are ignored as travel or workshop money.
+Two features come out: active awards, and months since the latest one started.
+The explanation says when an award is recent enough to fund a student in the next cycle, and says plainly that NSERC and NIH are not checked.
+
+**Record scorer** (`tools/openalex.ts` and `tools/tabpfn.ts`, step 5).
+OpenAlex supplies every paper since 2008 with its author list.
+From that come the features: new first authors per year and their trend, the cohort of junior coauthors still active, how many finished recently, papers per year and their trend, career length, years since the last paper, plus the two grant features.
+TabPFN, the Prior Labs tabular foundation model, is fit once on the labeled professors and returns the probability that a group with this record is taking students.
+Three refusals guard it: a field that lists authors alphabetically carries no first-author signal; an author with under five papers has no record to score; a name that matches several OpenAlex authors, or none at the given school, is not guessed.
+
+**Explainer** (`tools/explain.ts`, step 5).
+Deterministic sentences, one per driver, each comparing a feature with the medians of the labeled recruiting and not-recruiting groups.
+Dormancy comes first because it overrides everything.
+The closing sentence reconciles the page with the score, for example "the page says yes, but only 31% of labs that publish like this were taking students; the note may be old or aspirational".
+Because the text is built from the features rather than generated, it is testable and it never contradicts the number.
+
+**Verdict** (`verdict.ts` and `web/src/verdict.ts`).
+One schema for every outcome, whether stated, inferred or not scored, so the interface and the history never see a special case.
+The web app combines the two signals into the label table above.
+
+**Server** (`index.ts`).
+Email and password accounts with a signed cookie, a check route that streams each step's start and result as server-sent events and then the verdict, and three rate limits: per user, per address on sign-in, and a global daily cap that protects the shared search quota from throwaway accounts.
+The built web app is served from the same process.
+
+**Storage and observability.**
+MongoDB Atlas holds users, checks, the labeled feature table that TabPFN learns from, and Mastra's own workflow state.
+Sentry receives a trace for every run through Mastra's exporter, so a slow or failed step can be seen step by step.
+
+### Why open parts matter here
+
+Every component is replaceable by configuration, and that is not an accident.
+The reader is any OpenAI-compatible endpoint, so it has run on Google AI Studio, on a self-hosted Gemma and on a proxy during development without a code change.
+The labeled table is two CSV files anyone can extend with a careful hour of reading.
+The features are documented numbers, not embeddings, so the explanation can be checked by a human.
+OpenAlex and the NSF API are open data; the agent would be impossible on closed bibliographic databases.
+TabPFN replaces a model that would otherwise need thousands of labels; with 59 it gives a calibrated probability and a leave-one-out estimate.
+
+### What the numbers say
+
+`npm run batch` runs the check over the labeled shortlist and reports agreement between the reader and the hand labels.
+In the last run the reader agreed with the hand label for 50 of 59 professors.
+The misses are mostly pages whose recruiting note lives on a page the locator did not reach, which is the next thing to improve.
 
 ## Built with
 
-Mastra (workflow and agent), Gemma (page reading, through any OpenAI-compatible host), TabPFN by Prior Labs (scoring), OpenAlex (publications), the NSF awards API (grants), SerpApi (search), MongoDB Atlas (accounts, checks, workflow state), Sentry (traces), Render (hosting).
+Mastra (workflow, agent and server), Gemma (query parsing and page reading), TabPFN by Prior Labs (scoring), OpenAlex (publications), the NSF awards API (grants), SerpApi (search), MongoDB Atlas (accounts, checks, workflow state), Sentry (traces), Render (hosting), Docker (local and production parity), GitHub Actions (CI).
 
 ## Run it locally
 
@@ -112,23 +219,19 @@ web/                    the React app (Vite)
 scripts/features.ts     OpenAlex and NSF features for the labeled table into Mongo
 scripts/batch.ts        runs the workflow over the shortlist and scores it against the hand labels
 data/                   the hand-labeled shortlist and the not-recruiting negatives
+docs/                   the screenshot and the architecture diagram, with its HTML source
 ```
 
-## The shortlist
+## The labeled data
 
 Fifty-nine ML professors at US and Canadian universities, picked from last authors of NeurIPS 2024 and 2025 papers in OpenAlex, at most three per school, weighted toward early career, plus seventeen professors who state they are not taking students.
 Each one's faculty and lab pages were read by hand on 2026-10-13 and the recruiting statement, if any, was copied verbatim with its URL.
 A statement dated before 2025 counts as unstated.
-
-| Status | Count |
-|---|---|
-| Recruiting | 30 |
-| Not recruiting | 4 |
-| Unstated | 25 |
+The two CSV files in `data/` are the whole dataset, and adding a careful label is the most valuable contribution this project can get.
 
 ## Contributing
 
-Pull requests are welcome, and a carefully labeled professor is the most valuable one.
+Pull requests are welcome.
 [CONTRIBUTING.md](CONTRIBUTING.md) has the setup, the checks to run, the commit style and how to add a label.
 
 ## Limitations
@@ -138,6 +241,7 @@ Publication lag means current intake is never directly observable; the claim is 
 OpenAlex author matching is imperfect for common names.
 Only NSF grants are checked; NSERC and NIH are not, and the explanation says so for Canadian labs.
 Search results vary between runs, so the same professor can resolve to a different page on a second check.
+The labeled set is machine learning only; other fields publish differently and would need their own labels.
 Nothing is ever emailed on your behalf.
 
 ## License

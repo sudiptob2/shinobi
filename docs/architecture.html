@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!-- Source of docs/architecture.png. Render: open in a browser at 1240px wide, or see CONTRIBUTING.md. Logos come from web/public/logos. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 1240px; background: #fff; color: #18181b; font-family: Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 12.5px; }
+  .page { padding: 28px 36px 26px; display: grid; gap: 18px; }
+  .title { display: flex; align-items: center; gap: 10px; }
+  .title b { font-size: 18px; letter-spacing: -.02em; }
+  .title span { color: #71717a; font-size: 14px; margin-left: 4px; }
+  .row { display: grid; grid-template-columns: 210px 24px 1fr 24px 1fr 24px 170px; align-items: center; gap: 0; }
+  .card { background: #fff; border: 1px solid #d4d4d8; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; min-height: 64px; }
+  .card.pill { border-radius: 999px; background: #f4f4f5; border-color: #e4e4e7; justify-content: center; text-align: center; }
+  .card b { display: block; font-size: 13px; }
+  .card small { display: block; color: #71717a; font-size: 11.5px; margin-top: 2px; }
+  .arrow { height: 1.5px; background: #18181b; position: relative; }
+  .arrow::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 7px solid #18181b; border-right: 0; }
+  .arrow.both::before { content: ""; position: absolute; left: -1px; top: -4px; border: 5px solid transparent; border-right: 7px solid #18181b; border-left: 0; }
+  .arrow.dash { background: repeating-linear-gradient(90deg, #a1a1aa 0 4px, transparent 4px 7px); } .arrow.dash::after { border-left-color: #a1a1aa; }
+  .logo { height: 26px; width: auto; flex: none; } .logo.inv { filter: invert(1); } .logo.sq { height: 28px; }
+  .band { border: 1px solid #e4e4e7; background: #fafafa; border-radius: 16px; padding: 16px 18px 18px; display: grid; gap: 14px; }
+  .band-head { display: flex; align-items: baseline; gap: 10px; } .band-head b { font-size: 13px; } .band-head span { color: #71717a; }
+  .steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .step { background: #fff; border: 1.5px solid #d4d4d8; border-radius: 12px; padding: 12px 12px 10px; display: grid; gap: 8px; position: relative; }
+  .step.g { border-color: #34c759; } .step.y { border-color: #f5a623; }
+  .step .n { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+  .step .n i { width: 20px; height: 20px; border-radius: 50%; background: #18181b; color: #fff; font-style: normal; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+  .step.g .n i { background: #34c759; color: #0b2a14; } .step.y .n i { background: #f5a623; color: #3a2a10; }
+  .step p { color: #52525b; font-size: 11.5px; line-height: 1.35; min-height: 31px; }
+  .step .calls { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid #ececef; color: #3f3f46; font-size: 11.5px; font-weight: 500; }
+  .step .calls .logo { height: 20px; }
+  .step .calls .plus { color: #a1a1aa; }
+  .badge { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 9px; font-weight: 800; color: #fff; letter-spacing: .02em; flex: none; }
+  .signals { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: center; }
+  .sig { border-radius: 999px; padding: 8px 10px; text-align: center; font-size: 11.5px; font-weight: 600; }
+  .sig.g { grid-column: 3; background: #e7f7ec; color: #1f8a3b; border: 1px solid #34c759; }
+  .sig.v { grid-column: 4; background: #18181b; color: #fff; font-size: 12px; }
+  .sig.y { grid-column: 5; background: #fff4e0; color: #b06a00; border: 1px solid #f5a623; }
+  .sig small { display: block; font-weight: 400; color: inherit; opacity: .8; font-size: 10.5px; margin-top: 1px; }
+  .foot { display: flex; align-items: center; gap: 22px; color: #71717a; font-size: 11.5px; padding-top: 2px; }
+  .foot .item { display: flex; align-items: center; gap: 7px; color: #3f3f46; font-weight: 500; }
+  .foot .sep { width: 1px; height: 16px; background: #e4e4e7; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="title">
+    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1 L19.5 12.5 L31 16 L19.5 19.5 L16 31 L12.5 19.5 L1 16 L12.5 12.5 Z" fill="#18181b"/><circle cx="16" cy="16" r="3" fill="#fff"/></svg>
+    <b>Shinobi</b><span>how a check runs, in about thirty seconds</span>
+  </div>
+
+  <div class="row">
+    <div class="card pill"><div><b>A PhD applicant</b><small>a name, or a page URL</small></div></div>
+    <div class="arrow"></div>
+    <div class="card"><svg class="logo" viewBox="-11.5 -10.23 23 20.46" width="26" height="26"><circle r="2.05" fill="#087ea4"/><g stroke="#087ea4" stroke-width="1" fill="none"><ellipse rx="11" ry="4.2"/><ellipse rx="11" ry="4.2" transform="rotate(60)"/><ellipse rx="11" ry="4.2" transform="rotate(120)"/></g></svg><div><b>Web app</b><small>every step shown live, then the verdict</small></div></div>
+    <div class="arrow both"></div>
+    <div class="card"><img class="logo inv" src="../web/public/logos/mastra.svg" alt="Mastra"><div><b>Mastra server</b><small>accounts, one streamed check route</small></div></div>
+    <div class="arrow dash"></div>
+    <div class="card"><img class="logo inv sq" src="../web/public/logos/sentry.svg" alt="Sentry"><div><b>Sentry</b><small>a trace per run</small></div></div>
+  </div>
+
+  <div class="band">
+    <div class="band-head"><b>The check</b><span>a Mastra workflow in six steps. Two of them produce a signal; the verdict shows both.</span></div>
+    <div class="steps">
+      <div class="step"><div class="n"><i>1</i>parse</div><p>the typed text into a name and a university</p><div class="calls"><img class="logo" src="../web/public/logos/gemma.svg" alt="">Gemma</div></div>
+      <div class="step"><div class="n"><i>2</i>locate</div><p>the faculty or lab page, aggregators skipped</p><div class="calls"><img class="logo" src="../web/public/logos/serpapi.svg" alt="">SerpApi</div></div>
+      <div class="step g"><div class="n"><i>3</i>read</div><p>the page and its lab pages; quote any statement, drop stale ones</p><div class="calls"><img class="logo" src="../web/public/logos/gemma.svg" alt="">Gemma</div></div>
+      <div class="step"><div class="n"><i>4</i>grants</div><p>active NSF awards and how recent the latest is</p><div class="calls"><span class="badge" style="background:#1b4e9b">NSF</span>NSF awards API</div></div>
+      <div class="step y"><div class="n"><i>5</i>infer</div><p>ten publication features, a probability, and why</p><div class="calls"><img class="logo" src="../web/public/logos/openalex.png" alt="">OpenAlex<span class="plus">+</span><img class="logo" src="../web/public/logos/priorlabs.png" alt="">TabPFN</div></div>
+      <div class="step"><div class="n"><i>6</i>save</div><p>the verdict into the applicant's history</p><div class="calls"><img class="logo" src="../web/public/logos/mongodb.svg" alt="">MongoDB Atlas</div></div>
+    </div>
+    <div class="signals">
+      <div class="sig g">Their words<small>quoted, with the link</small></div>
+      <div class="sig v">One verdict<small>both signals, side by side</small></div>
+      <div class="sig y">Their record<small>a probability, with reasons</small></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>One Docker image, everywhere</span>
+    <span class="sep"></span>
+    <span class="item"><svg width="18" height="18" viewBox="0 0 16 16" fill="#18181b" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub Actions runs the checks</span>
+    <span class="item"><img class="logo inv" style="height:18px" src="../web/public/logos/render.svg" alt="">Render deploys main once they pass</span>
+    <span class="item"><img class="logo" style="height:18px" src="../web/public/logos/mongodb.svg" alt="">MongoDB Atlas</span>
+    <span class="item"><img class="logo" style="height:18px" src="../web/public/logos/digitalocean.svg" alt="">DigitalOcean hosts Gemma</span>
+  </div>
+</div>
+</body>
+</html>
