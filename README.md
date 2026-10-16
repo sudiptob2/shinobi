@@ -9,7 +9,7 @@
 
 Live at [https://askshinobi.tech](https://askshinobi.tech)
 
-![Shinobi verdict card](docs/assets/screenshot.png)
+![One check: typing a professor and university, the 6 steps running, and the verdict card with the quote and score](docs/assets/demo.gif)
 
 ## Why
 
