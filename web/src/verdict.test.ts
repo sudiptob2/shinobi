@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verdictOf } from "./verdict.ts";
+import { fmt, verdictOf } from "./verdict.ts";
 import type { Verdict } from "./api.ts";
 
 const v = (stated?: "recruiting" | "not_recruiting", p?: number): Verdict => ({
@@ -22,4 +22,11 @@ test("one label from the page and the publications", () => {
     [v(), "Not scored"],
   ];
   for (const [x, want] of cases) assert.equal(verdictOf(x).label, want);
+});
+
+test("fractions show as percentages, counts and rates as numbers", () => {
+  assert.equal(fmt("last_author_rate", 0.54), "54%");
+  assert.equal(fmt("industry_share", 0), "0%");
+  assert.equal(fmt("pub_rate", 11.67), "11.7");
+  assert.equal(fmt("students_active", 7), "7");
 });

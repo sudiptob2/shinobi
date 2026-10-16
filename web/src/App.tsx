@@ -14,7 +14,6 @@ const STACK: [string, string, string, string][] = [
   ["SerpApi", "Finds the page", "https://serpapi.com", "/logos/serpapi.svg"],
   ["MongoDB Atlas", "Accounts, checks and workflow state", "https://www.mongodb.com/atlas", "/logos/mongodb.svg"],
   ["Sentry", "Traces every run", "https://sentry.io", "/logos/sentry.svg"],
-  ["DigitalOcean", "Hosts Gemma", "https://www.digitalocean.com", "/logos/digitalocean.svg"],
   ["Render", "Hosts the app", "https://render.com", "/logos/render.svg"],
 ];
 const fresh = (): Step[] => STEPS.map((id) => ({ id, state: "wait" }));

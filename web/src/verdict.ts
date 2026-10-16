@@ -44,4 +44,5 @@ export const FEATURE_NAMES: Record<string, string> = {
   active_grants: "Active NSF awards",
   industry_share: "Recent papers from a company",
 };
-export const fmt = (k: string, n: number) => (k.endsWith("rate") || k.endsWith("share") ? `${Math.round(n * 100)}%` : Number.isInteger(n) ? String(n) : n.toFixed(1));
+const PCT = new Set(["last_author_rate", "industry_share"]); // fractions of papers; pub_rate is papers per year
+export const fmt = (k: string, n: number) => (PCT.has(k) ? `${Math.round(n * 100)}%` : Number.isInteger(n) ? String(n) : n.toFixed(1));
