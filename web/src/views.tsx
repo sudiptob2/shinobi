@@ -170,7 +170,7 @@ export function Table({ title, note, empty, rows, filter, onFilter, onPick, limi
                 <td className="p">{v.inferred ? v.inferred.probability.toFixed(2) : ""}</td>
                 <td className="e">
                   {v.stated && <>“{v.stated.quote}”<a className="link" href={v.stated.sourceUrl} target="_blank" rel="noreferrer">{host(v.stated.sourceUrl)}</a></>}
-                  {!v.stated && v.inferred && <>Nothing stated. Last author on {fmt("last_author_rate", v.inferred.features.last_author_rate)} of recent papers, {v.inferred.features.students_active} students publishing now, {v.inferred.features.students_left} finished recently.</>}
+                  {!v.stated && v.inferred && <>Nothing stated.{v.explanation?.[0] ? ` ${v.explanation[0]}` : ""}</>}
                   {!v.stated && !v.inferred && v.reason}
                 </td>
               </tr>
