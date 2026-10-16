@@ -14,6 +14,7 @@ cp .env.example .env            # fill in the keys
 docker compose up mongo          # Mongo
 npm install && npm install --prefix web
 npm run dev                     # the Mastra server on http://localhost:4111
+STUDIO=1 npm run dev            # the same, serving Mastra Studio at / instead of the web app
 ```
 
 The server serves the built web app from `web/dist`.

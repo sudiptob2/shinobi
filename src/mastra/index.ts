@@ -106,14 +106,14 @@ export const mastra = new Mastra({
         return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
       } }),
 
-      // the built web app, with the SPA fallback
-      registerApiRoute("/*", { method: "GET", handler: async (c) => {
+      // the built web app, with the SPA fallback. STUDIO=1 leaves it out so `mastra dev` can show Studio instead.
+      ...(process.env.STUDIO ? [] : [registerApiRoute("/*", { method: "GET", handler: async (c) => {
         const path = normalize(new URL(c.req.url).pathname).replace(/^(\.\.[/\\])+/, "");
         const file = join(WEB, path);
         const target = existsSync(file) && extname(file) ? file : join(WEB, "index.html");
         if (!existsSync(target)) return c.text("Web app not built. Run: npm run build", 404);
         return c.body(readFileSync(target), 200, { "content-type": MIME[extname(target)] ?? "application/octet-stream" });
-      } }),
+      } })]),
     ],
   },
 });
