@@ -15,10 +15,10 @@ async function serp<T>(params: Record<string, string>): Promise<T> {
   return (await r.json()) as T;
 }
 
-/** Every meaningful token of the query name appears in the candidate name (initials ignored). */
+/** Every meaningful token of the query name appears in the candidate name (initials ignored); a short form like "Ben" matches "Benjamin". */
 export function sameName(query: string, candidate?: string): boolean {
   const c = words(candidate);
-  return c.length > 0 && words(query).every((w) => c.includes(w));
+  return c.length > 0 && words(query).every((w) => c.some((x) => x === w || (w.length >= 3 && x.startsWith(w))));
 }
 
 const hostOf = (u: string) => { try { return new URL(u).host; } catch { return ""; } };
@@ -30,12 +30,6 @@ type Organic = { link: string; title: string };
  * Google through SerpApi returned aggregators and namesakes, so it is not used.
  */
 export async function findFacultyPage(name: string, affiliation?: string): Promise<{ url: string; via: string; affiliation?: string } | null> {
-  let results: Organic[] = [];
-  for (const q of [`"${name}" ${affiliation ?? ""}`.trim(), `${name} ${affiliation ?? ""} professor`.trim()]) {
-    const d = await serp<{ organic_results?: Organic[] }>({ engine: "duckduckgo", q, kl: "us-en" });
-    results = (d.organic_results ?? []).filter((o) => sameName(name, o.title));
-    if (results.length) break;
-  }
   // academic hosts first, then pages whose title reads academic; people-search and social sites never
   const score = (o: Organic) => {
     const host = hostOf(o.link);
@@ -44,6 +38,13 @@ export async function findFacultyPage(name: string, affiliation?: string): Promi
       + (/universit|college|institute|professor|faculty|lab\b|research|department/i.test(o.title) ? 2 : 0)
       + (/\/~|github\.io/i.test(o.link) ? 1 : 0);
   };
+  let results: Organic[] = [];
+  for (const q of [`"${name}" ${affiliation ?? ""}`.trim(), `${name} ${affiliation ?? ""} professor`.trim()]) {
+    const d = await serp<{ organic_results?: Organic[] }>({ engine: "duckduckgo", q, kl: "us-en" });
+    results = (d.organic_results ?? []).filter((o) => sameName(name, o.title));
+    // a query that only surfaced news and profiles on other sites is not an answer; try the next one
+    if (results.some((o) => score(o) > 0 || /scholar\.google/.test(o.link))) break;
+  }
   const pages = results.map((o) => ({ o, s: score(o) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).map((x) => x.o);
   const page = pages[0];
   if (page) {
