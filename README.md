@@ -9,7 +9,7 @@
 
 Live at [https://askshinobi.tech](https://askshinobi.tech)
 
-![Shinobi verdict card](docs/screenshot.png)
+![Shinobi verdict card](docs/assets/screenshot.png)
 
 ## Why
 
@@ -20,15 +20,15 @@ She asked me for help, because I had been through the same thing for my Master's
 So we sat down with her list.
 Many of those professors were simply **not taking new students that year**.
 Some of their pages said nothing about it.
-Some said "I am always looking for students", but the note was *three or four years old*.
+Some said "I am always looking for students", but the note was *3 or 4 years old*.
 There was *no way to know* before sending the email.
 
 That made me think this is something **every prospective student runs into**.
 We all spend weeks writing to people who were never going to say yes, and the professors who are actually recruiting get lost in the same pile.
 
-To check how common it is, I read the faculty and lab pages of 59 machine learning professors by hand.
-Thirty said they were taking students, four said they were not, and **twenty-five said nothing at all**.
-Even among the thirty who said yes, several had old notes, and several more had a publication record that did not look like a group with room for new students.
+To check how common it is, I read the faculty and lab pages of 60 machine learning professors by hand.
+31 said they were taking students, 4 said they were not, and **25 said nothing at all**.
+Even among the 31 who said yes, several had old notes, and several more had a publication record that did not look like a group with room for new students.
 
 So I built Shinobi.
 It is an AI agent that does the checking for you: it finds the professor's page, reads what it says and *how old it is*, looks up their recent grants, and studies their publication record for signs of a group that takes students, such as how many new first authors appear each year and how many students have finished recently.
@@ -36,7 +36,7 @@ It puts all of that together into **one verdict**, with the professor's own word
 
 ## How it works
 
-![Architecture](docs/architecture.png)
+![Architecture](docs/assets/architecture.png)
 
 A check is a [Mastra](https://mastra.ai) workflow with six steps.
 Three of the steps are run by an **agent** built on Gemma, served from any OpenAI-compatible endpoint; in production it is Gemma 4 26B on my own GPU through vLLM.
@@ -55,7 +55,7 @@ The two signals, **what the page says** and **what the record says**, are combin
 Around the workflow there is a React front end that shows each step as it runs, accounts and rate limits, MongoDB Atlas for users, checks and the labeled data, and a Sentry trace for every run.
 Everything ships as **one Docker image**: the same image runs locally with Compose and in production on Render, deployed from `main` once CI passes.
 
-In the last batch run, the reader agreed with my hand labels for **50 of 59** professors.
+In the last batch run, the reader agreed with my hand labels for **51 of 60** professors.
 
 ## Run it
 
